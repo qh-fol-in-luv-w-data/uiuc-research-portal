@@ -10,6 +10,13 @@ from .names import AuthorIndex, link_confidence, normalize_name
 
 TOP_TOPICS = 15
 MAX_KEYWORDS = 80
+# initial-only matches ("J. Ross") are verified against topics even with one candidate;
+# below this cosine the confidence is halved (so they fall under the 0.5 link threshold)
+MIN_TOPIC_COS = 0.45
+
+
+def needs_topic_check(method: str, ids: list[str]) -> bool:
+    return len(ids) > 1 or method == "initial_last"
 
 
 def find_candidates(conn: psycopg.Connection) -> dict[int, tuple[str, list[str]]]:
@@ -34,7 +41,7 @@ def _faculty_text(keywords: list[str]) -> str:
 
 
 def embed_profiles(conn: psycopg.Connection, embedder) -> dict:
-    ambiguous = {fid: ids for fid, (_, ids) in find_candidates(conn).items() if len(ids) > 1}
+    ambiguous = {fid: ids for fid, (m, ids) in find_candidates(conn).items() if needs_topic_check(m, ids)}
     author_ids = sorted({a for ids in ambiguous.values() for a in ids})
     with conn.cursor() as cur:
         cur.execute("SELECT id, keywords FROM faculty WHERE id = ANY(%s) AND keyword_embedding IS NULL ORDER BY id",
@@ -92,12 +99,14 @@ def link_faculty(conn: psycopg.Connection, min_confidence: float = 0.5) -> dict:
     by_method: Counter[str] = Counter()
     below = 0
     for fid, (method, ids) in cands.items():
-        if len(ids) == 1:
+        if not needs_topic_check(method, ids):
             choice, conf = 0, link_confidence(method, [1.0])[1]
         else:
             fv = fac_vec.get(fid)
             cos = [_cos(fv, auth_vec[a]) if fv is not None and a in auth_vec else 0.0 for a in ids]
             choice, conf = link_confidence(method, cos)
+            if method == "initial_last" and cos[choice] < MIN_TOPIC_COS:
+                conf = round(conf * 0.5, 4)
         if conf < min_confidence:
             below += 1
             continue

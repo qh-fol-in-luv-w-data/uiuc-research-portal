@@ -52,6 +52,7 @@ class ParsedWork:
     work_topics: list[tuple[str, float]] = field(default_factory=list)
     # authorships OpenAlex has not attributed to an author id: no author row, but still affiliation evidence
     unattributed_uiuc: bool = False
+    raw_authorship_count: int = 0
     unattributed_raw: list[str] = field(default_factory=list)
 
 
@@ -89,6 +90,7 @@ def parse_work(w: dict) -> ParsedWork:
     })
     insts: dict[str, dict] = {}
     seen: set[str] = set()
+    p.raw_authorship_count = len(w.get("authorships") or [])
     for a in w.get("authorships") or []:
         au = a.get("author") or {}
         aid = short_id(au.get("id"))
@@ -142,7 +144,7 @@ def mark_outliers(items: list[ParsedWork]) -> dict[str, int]:
         raws = [a["raw_affiliation"] or "" for a in p.authorships] + p.unattributed_raw
         mentions = any("illinois" in r.lower() for r in raws)
         reason = None
-        truncated = len(p.authorships) >= TRUNCATED_AUTHORS  # the UIUC author may be cut off
+        truncated = p.raw_authorship_count >= TRUNCATED_AUTHORS  # the UIUC author may be cut off
         if not has_uiuc and not mentions and not truncated:
             reason = "no_uiuc_affiliation"
         elif p.work["language"] not in (None, "en") and p99 > 0 and p.work["cited_by_count"] >= p99:

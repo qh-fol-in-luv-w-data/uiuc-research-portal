@@ -64,9 +64,15 @@ class AuthorIndex:
             if method == "initial_last":
                 # only authors recorded with an initial; a different full first name is another person
                 ids = [a for a in ids if len(self._parts[a].first) == 1]
+            ids = [a for a in ids if not _middle_conflict(fac, self._parts[a])]
             if ids:
                 return method, sorted(ids)
         return None
+
+
+def _middle_conflict(fac: NameParts, author: NameParts) -> bool:
+    """'John A. Smith' and 'John B. Smith' are different people; a missing middle is not a conflict."""
+    return bool(fac.middles and author.middles and fac.middles[0][0] != author.middles[0][0])
 
 
 def link_confidence(method: str, cosines: list[float]) -> tuple[int, float]:
