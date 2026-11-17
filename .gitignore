@@ -11,3 +11,7 @@ finetune/models/
 data/illinois-researchers.csv
 docs/AOLTask.pdf
 db/dump/
+
+# Finetune kit: rsync to the GPU server, not published in git
+finetune/
+.DS_Store
