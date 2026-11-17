@@ -748,6 +748,8 @@ git commit -m "feat(ingest): pure work cleaning, parsing and outlier rules"
 
 ### Task 3: OpenAlex client with page cache, retry and quota stop
 
+> **Amendment (2026-11-17, found during execution):** OpenAlex now returns `401 API key required for cursor paging` past page 1 without a key. Implementation switched to page-number paging over calendar-month slices (`month_slices()`, each slice ≤ 10,000 results, last slice open-ended); `SliceTooLarge` guards the 10k limit. Cache pages store `next_page` instead of `next_cursor`. The code in `ingest/openalex.py` and `tests/test_openalex.py` is authoritative; the snippets below are the original design.
+
 **Files:**
 - Create: `ingest/openalex.py`
 - Test: `tests/test_openalex.py`

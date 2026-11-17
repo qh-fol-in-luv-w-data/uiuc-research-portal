@@ -95,7 +95,7 @@ Index: GIN trên `tsv`; HNSW (`vector_cosine_ops`) trên `embedding`; B-tree tr�
 
 Mỗi bước là một subcommand (`python -m ingest <step>`), idempotent; `make ingest` chạy tuần tự. Response OpenAlex được cache ra `ingest/.cache/` (JSONL theo trang) để chạy lại không tốn quota.
 
-1. **fetch-works** — `/works` filter UIUC + 2 năm, `cursor=*`, `per_page=200`, `select` chỉ các trường cần; retry exponential backoff, đọc header `x-ratelimit-*`, dừng an toàn khi gần hết quota và resume được.
+1. **fetch-works** — `/works` filter UIUC + 2 năm, chia thành lát theo tháng (cursor paging nay bắt buộc API key; page paging giới hạn 10.000 kết quả/truy vấn), `page=1..n`, `per_page=200`, `select` chỉ các trường cần; retry exponential backoff, đọc header `x-ratelimit-*`, dừng an toàn khi gần hết quota và resume được.
 2. **clean-works**
    - Giữ `type ∈ {article, preprint, review, book-chapter}` và conference paper (theo `primary_location.source.type = conference`).
    - Loại `is_retracted`, `is_paratext`, thiếu title.
