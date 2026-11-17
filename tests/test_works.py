@@ -62,3 +62,24 @@ def test_cap_by_date_keeps_newest():
              parse_work(make_work(id="W3", date=None))]
     assert [p.work["id"] for p in cap_by_date(items, limit=1)] == ["W2"]
     assert len(cap_by_date(items, limit=10)) == 3
+
+
+def test_conference_paper_type_is_kept():
+    assert drop_reason(make_work(type="conference-paper")) is None
+    assert drop_reason(make_work(type="conference-abstract")) == "type:conference-abstract"
+
+
+def test_is_uiuc_via_child_institution_lineage():
+    child = {"id": "https://openalex.org/I555", "display_name": "Beckman Institute", "country_code": "US",
+             "type": "facility", "lineage": ["https://openalex.org/I555", "https://openalex.org/I157725225"]}
+    p = parse_work(make_work(authorships=[make_author("A1", "X Y", [child], "Beckman Institute")]))
+    assert p.authorships[0]["is_uiuc"] is True
+    mark_outliers([p])
+    assert not p.work["is_outlier"]
+
+
+def test_truncated_author_list_is_not_flagged_missing_affiliation():
+    auths = [make_author(f"A{i}", f"P Q{i}", [HERZEN], "CERN") for i in range(100)]
+    p = parse_work(make_work(authorships=auths))
+    mark_outliers([p])
+    assert not p.work["is_outlier"]

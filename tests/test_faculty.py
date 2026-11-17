@@ -47,3 +47,14 @@ def test_load_faculty(db, tmp_path):
     assert rows[0] == ("Jiawei Han", None, ["text mining"], ["text mining", "real world"])
     assert len(rows) == 2
     assert get_stat(db, "dq_faculty")["rows"] == 2
+
+
+def test_load_faculty_reports_unique_rows(db, tmp_path):
+    p = tmp_path / "f.csv"
+    with p.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh, quoting=csv.QUOTE_ALL)
+        w.writerow(["email", "name", "photo_url", "position", "keywords"])
+        w.writerow(["a@illinois.edu", "A One", "NULL", "Professor", "{x1}"])
+        w.writerow(["A@illinois.edu", "A One", "NULL", "Professor", "{x2}"])
+    report = load_faculty(db, p, tmp_path)
+    assert report["rows"] == 1 and report["duplicate_emails"] == ["a@illinois.edu"]

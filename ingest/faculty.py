@@ -67,12 +67,19 @@ def load_faculty(conn: psycopg.Connection, csv_path: Path, data_dir: Path) -> di
         org_names = {r[0] for r in cur.fetchall()}
     csv.field_size_limit(10 ** 8)
     rows = []
+    seen: set[str] = set()
+    duplicates: list[str] = []
     with csv_path.open(encoding="utf-8", newline="") as fh:
         for r in csv.DictReader(fh):
+            email = r["email"].strip().lower()
+            if email in seen:
+                duplicates.append(email)  # first occurrence wins
+                continue
+            seen.add(email)
             raw = parse_pg_array(r.get("keywords"))
             clean = clean_keywords(raw, stoplist, org_names, generic)
             rows.append({
-                "email": r["email"].strip().lower(), "name": r["name"].strip(),
+                "email": email, "name": r["name"].strip(),
                 "photo_url": _nullable(r.get("photo_url")), "position": _nullable(r.get("position")),
                 "keywords_raw": raw, "keywords": clean, "keywords_text": ", ".join(clean),
             })
@@ -88,6 +95,7 @@ def load_faculty(conn: psycopg.Connection, csv_path: Path, data_dir: Path) -> di
     conn.commit()
     report = {
         "rows": len(rows),
+        "duplicate_emails": duplicates,
         "missing_photo": sum(1 for r in rows if r["photo_url"] is None),
         "missing_position": sum(1 for r in rows if r["position"] is None),
         "keywords_raw_median": statistics.median([len(r["keywords_raw"]) for r in rows]) if rows else 0,
