@@ -12,7 +12,7 @@ TOP_TOPICS = 15
 MAX_KEYWORDS = 80
 # initial-only matches ("J. Ross") are verified against topics even with one candidate;
 # below this cosine the confidence is halved (so they fall under the 0.5 link threshold)
-MIN_TOPIC_COS = 0.45
+MIN_TOPIC_COS = 0.60  # calibrated 2026-11-17 on 15 manual checks: wrong 0.514, lowest correct 0.650
 
 
 def needs_topic_check(method: str, ids: list[str]) -> bool:

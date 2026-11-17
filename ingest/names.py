@@ -9,6 +9,8 @@ from unidecode import unidecode
 SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "phd", "md"}
 METHODS = ("exact", "first_last", "initial_last")
 METHOD_BASE = {"exact": 0.9, "first_last": 0.75, "initial_last": 0.6}
+# an initial-only match is a guess when this many UIUC authors share the surname (e.g. 529 "Zhang")
+COMMON_SURNAME = 20
 
 
 @dataclass(frozen=True)
@@ -46,12 +48,14 @@ class AuthorIndex:
     def __init__(self) -> None:
         self._index: dict[str, dict[str, list[str]]] = {m: defaultdict(list) for m in METHODS}
         self._parts: dict[str, NameParts] = {}
+        self._surnames: dict[str, int] = defaultdict(int)
 
     def add(self, author_id: str, display_name: str) -> None:
         p = normalize_name(display_name)
         if p is None or author_id in self._parts:
             return
         self._parts[author_id] = p
+        self._surnames[p.last] += 1
         for method, key in _keys(p).items():
             self._index[method][key].append(author_id)
 
@@ -61,6 +65,8 @@ class AuthorIndex:
         keys = _keys(fac)
         for method in METHODS:
             ids = list(self._index[method].get(keys[method], []))
+            if method == "initial_last" and self._surnames[fac.last] >= COMMON_SURNAME:
+                return None
             if method == "initial_last":
                 # only authors recorded with an initial; a different full first name is another person
                 ids = [a for a in ids if len(self._parts[a].first) == 1]

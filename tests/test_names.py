@@ -39,3 +39,14 @@ def test_conflicting_middle_initial_is_rejected():
     idx2 = AuthorIndex()
     idx2.add("A3", "J. B. Smith")
     assert idx2.match(normalize_name("John A Smith")) is None
+
+
+def test_initial_tier_skipped_for_very_common_surname():
+    idx = AuthorIndex()
+    idx.add("A0", "S. Zhang")
+    for i in range(25):
+        idx.add(f"A{i + 1}", f"Person{chr(97 + i % 26)}x Zhang")
+    assert idx.match(normalize_name("Shelly Zhang")) is None
+    rare = AuthorIndex()
+    rare.add("B0", "S. Ross")
+    assert rare.match(normalize_name("Sam Ross")) == ("initial_last", ["B0"])
