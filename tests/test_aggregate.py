@@ -1,0 +1,41 @@
+from ingest.aggregate import aggregate
+from ingest.db import get_stat, put_stat
+from ingest.load_works import load_works
+from tests.factories import HERZEN, UIUC, UISYS, make_author, make_topic, make_work
+
+
+def test_aggregate_stats(db, tmp_path):
+    works = [
+        make_work(id="W1", date="2025-01-10", cited=5, authorships=[
+            make_author("A1", "Jane Doe", [UIUC, UISYS], "UIUC"),
+            make_author("A2", "Ivan P", [HERZEN], "Herzen", position="last")]),
+        make_work(id="W2", date="2025-01-20", cited=7, source_type="conference", type="other"),
+        make_work(id="W3", date="2025-02-01", cited=1, topic=make_topic("T2", "Organic Synthesis",
+                  "Organic Chemistry", "Chemistry", "Physical Sciences")),
+        make_work(id="W4", authorships=[make_author("A3", "Q", [HERZEN], "Herzen")]),  # outlier
+    ]
+    load_works(db, works)
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO faculty (id, email, name) VALUES (1, 'j@x', 'Jane Doe')")
+        cur.execute("INSERT INTO faculty_author_link VALUES (1, 'A1', 0.9, 'exact')")
+    db.commit()
+    put_stat(db, "dq_faculty", {"rows": 1, "missing_photo": 0, "missing_position": 0,
+                                "keywords_raw_median": 1, "keywords_clean_median": 1})
+    put_stat(db, "dq_link", {"faculty": 1, "linked": 1, "rate": 1.0, "by_method": {"exact": 1},
+                             "no_candidate": 0, "below_threshold": 0})
+    stats = aggregate(db, tmp_path)
+    o = stats["overview"]
+    assert o["works"] == 3 and o["citations"] == 13 and o["outliers"] == 1
+    assert o["faculty"] == 1 and o["faculty_linked"] == 1
+    assert o["partner_institutions"] == 1  # Herzen only; UIUC + UI System excluded
+    assert stats["monthly"] == [{"month": "2025-01", "count": 2}, {"month": "2025-02", "count": 1}]
+    assert {t["type"] for t in stats["types"]} == {"article", "conference-paper"}
+    assert stats["fields"][0]["field"] == "Computer Science" and stats["fields"][0]["count"] == 2
+    assert stats["top_partners"][0]["name"] == "Herzen University"
+    assert stats["top_faculty"] == [{"id": 1, "name": "Jane Doe", "count": 3}]  # factory default author A1 is on W1–W3
+    assert get_stat(db, "monthly") == stats["monthly"]
+    with db.cursor() as cur:
+        cur.execute("SELECT primary_field FROM faculty WHERE id = 1")
+        assert cur.fetchone()[0] == "Computer Science"
+    report = (tmp_path / "data-quality.md").read_text()
+    assert "Link rate" in report and "100.0%" in report
