@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 
 UIUC_ID = "I157725225"
 UI_SYSTEM_ID = "I2801919071"
-KEEP_TYPES = {"article", "preprint", "review", "book-chapter"}
+KEEP_TYPES = {"article", "preprint", "review", "book-chapter", "conference-paper"}
+TRUNCATED_AUTHORS = 100  # OpenAlex list responses cap authorships at 100
 
 
 def short_id(url: str | None) -> str | None:
@@ -92,17 +93,21 @@ def parse_work(w: dict) -> ParsedWork:
             continue
         seen.add(aid)
         inst_ids = []
+        uiuc = False
         for i in a.get("institutions") or []:
             iid = short_id(i.get("id"))
             if not iid:
                 continue
             inst_ids.append(iid)
+            # child institutions (institutes, centers) list UIUC in their lineage
+            if iid == UIUC_ID or UIUC_ID in {short_id(x) for x in i.get("lineage") or []}:
+                uiuc = True
             insts[iid] = {"id": iid, "display_name": i.get("display_name"),
                           "country_code": i.get("country_code"), "type": i.get("type")}
         p.authors.append({"id": aid, "display_name": au.get("display_name") or "", "orcid": au.get("orcid")})
         p.authorships.append({
             "work_id": wid, "author_id": aid, "position": a.get("author_position"),
-            "is_uiuc": UIUC_ID in inst_ids,
+            "is_uiuc": uiuc,
             "raw_affiliation": "; ".join(a.get("raw_affiliation_strings") or []) or None,
         })
     p.institutions = list(insts.values())
@@ -126,7 +131,8 @@ def mark_outliers(items: list[ParsedWork]) -> dict[str, int]:
         has_uiuc = any(a["is_uiuc"] for a in p.authorships)
         mentions = any("illinois" in (a["raw_affiliation"] or "").lower() for a in p.authorships)
         reason = None
-        if not has_uiuc and not mentions:
+        truncated = len(p.authorships) >= TRUNCATED_AUTHORS  # the UIUC author may be cut off
+        if not has_uiuc and not mentions and not truncated:
             reason = "no_uiuc_affiliation"
         elif p.work["language"] not in (None, "en") and p99 > 0 and p.work["cited_by_count"] >= p99:
             reason = "non_english_high_citation"
