@@ -1757,7 +1757,12 @@ def embed_profiles(conn: psycopg.Connection, embedder) -> dict:
     return {"faculty": len(fac_rows), "authors": len(todo)}
 
 
-def _cos(a: np.ndarray, b: np.ndarray) -> float:
+def _np(v) -> np.ndarray:
+    return v.to_numpy() if hasattr(v, "to_numpy") else np.asarray(v, dtype=np.float32)
+
+
+def _cos(a, b) -> float:
+    a, b = _np(a), _np(b)
     na, nb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
     return float(a @ b / (na * nb)) if na and nb else 0.0
 
@@ -2000,7 +2005,7 @@ def test_aggregate_stats(db, tmp_path):
     assert {t["type"] for t in stats["types"]} == {"article", "conference-paper"}
     assert stats["fields"][0]["field"] == "Computer Science" and stats["fields"][0]["count"] == 2
     assert stats["top_partners"][0]["name"] == "Herzen University"
-    assert stats["top_faculty"] == [{"id": 1, "name": "Jane Doe", "count": 1}]
+    assert stats["top_faculty"] == [{"id": 1, "name": "Jane Doe", "count": 3}]  # factory default author A1 is on W1–W3
     assert get_stat(db, "monthly") == stats["monthly"]
     with db.cursor() as cur:
         cur.execute("SELECT primary_field FROM faculty WHERE id = 1")
