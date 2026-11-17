@@ -1,0 +1,19 @@
+# Dropped only for faculty with more than 200 raw keywords.
+mathematics
+computer science
+engineering
+science
+research
+technology
+information technology
+computational science
+statistics
+data
+analysis
+biology
+physics
+chemistry
+medicine
+psychology
+economics
+education
