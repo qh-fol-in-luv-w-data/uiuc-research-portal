@@ -18,7 +18,7 @@ def test_match_tiers():
     idx.add("A3", "J. Smith")
     idx.add("A4", "Jane Smith")
     assert idx.match(normalize_name("John A Smith")) == ("exact", ["A1"])
-    assert idx.match(normalize_name("John B Smith")) == ("first_last", ["A1", "A2"])
+    assert idx.match(normalize_name("John B Smith")) == ("first_last", ["A2"])  # A1 has middle A
     assert idx.match(normalize_name("Jack Smith")) == ("initial_last", ["A3"])  # Jane excluded
     assert idx.match(normalize_name("Wei Zhang")) is None
 
@@ -29,3 +29,13 @@ def test_link_confidence():
     assert i == 1 and c == 0.6
     i, c = link_confidence("initial_last", [0.70, 0.69])
     assert i == 0 and c < 0.5
+
+
+def test_conflicting_middle_initial_is_rejected():
+    idx = AuthorIndex()
+    idx.add("A1", "John B. Smith")
+    idx.add("A2", "John Smith")
+    assert idx.match(normalize_name("John A Smith")) == ("first_last", ["A2"])
+    idx2 = AuthorIndex()
+    idx2.add("A3", "J. B. Smith")
+    assert idx2.match(normalize_name("John A Smith")) is None

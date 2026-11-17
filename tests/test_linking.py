@@ -69,3 +69,18 @@ def test_embed_profiles_then_link(db):
     with db.cursor() as cur:
         cur.execute("SELECT count(*) FROM faculty_author_link")
         assert cur.fetchone()[0] == 2
+
+
+def test_initial_tier_single_candidate_requires_topic_agreement(db):
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO topics VALUES ('T2','Organic Chemistry',NULL,'Chemistry',NULL)")
+        cur.execute("INSERT INTO works (id, title, primary_topic_id) VALUES ('W2','b','T2')")
+        cur.execute("INSERT INTO work_topics VALUES ('W2','T2',0.9)")
+        cur.execute("INSERT INTO authors (id, display_name) VALUES ('A2','J. Ross')")
+        cur.execute("INSERT INTO authorships (work_id, author_id, is_uiuc) VALUES ('W2','A2',true)")
+        cur.execute("INSERT INTO faculty (email, name, keywords, keywords_text) VALUES"
+                    " ('jr@x','Joel Ross','{computer vision}','computer vision')")
+    db.commit()
+    assert embed_profiles(db, FakeEmbedder()) == {"faculty": 1, "authors": 1}
+    report = link_faculty(db)
+    assert report["linked"] == 0 and report["below_threshold"] == 1

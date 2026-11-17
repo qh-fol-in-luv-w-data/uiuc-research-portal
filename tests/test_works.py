@@ -94,3 +94,13 @@ def test_authorship_without_author_id_still_counts_as_uiuc_evidence():
     assert "I157725225" in p.work_institutions
     mark_outliers([p])
     assert not p.work["is_outlier"]
+
+
+def test_truncated_list_counted_before_dropping_unattributed():
+    auths = [make_author(f"A{i}", f"P Q{i}", [HERZEN], "CERN") for i in range(100)]
+    for a in auths[:10]:
+        a["author"]["id"] = None
+    p = parse_work(make_work(authorships=auths))
+    assert p.raw_authorship_count == 100
+    mark_outliers([p])
+    assert not p.work["is_outlier"]
