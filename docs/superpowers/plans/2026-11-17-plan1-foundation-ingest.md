@@ -17,7 +17,7 @@
 - UIUC OpenAlex institution id `I157725225`; University of Illinois System `I2801919071` (excluded from partner stats).
 - Works window: `from_publication_date = today − 2 years`, filter `institutions.id:I157725225`.
 - Embedding model `bge-m3`, dimension **1024**; Ollama at `OLLAMA_URL` (default `http://localhost:11434`; containers use `http://host.docker.internal:11434`).
-- Postgres exposed on host port **5433** (Homebrew Postgres 15 already uses 5432). DB `portal`, user/password `portal/portal`; test DB `portal_test`.
+- Postgres exposed on host port **55432** (5432–5434 are taken by other Postgres servers on the dev machine). DB `portal`, user/password `portal/portal`; test DB `portal_test`.
 - Do **not** use OpenAlex `search` per faculty. Only list `/works` with `cursor=*`, `per_page=200`, `select=`.
 - `OPENALEX_API_KEY` and `OPENALEX_MAILTO` are optional and default empty; never hard-code an email.
 - Every ingest step is idempotent and re-runnable.
@@ -109,8 +109,8 @@ finetune/models/
 
 `.env.example`:
 ```
-DATABASE_URL=postgresql://portal:portal@localhost:5433/portal
-TEST_DATABASE_URL=postgresql://portal:portal@localhost:5433/portal_test
+DATABASE_URL=postgresql://portal:portal@localhost:55432/portal
+TEST_DATABASE_URL=postgresql://portal:portal@localhost:55432/portal_test
 OLLAMA_URL=http://localhost:11434
 OLLAMA_CHAT_MODEL=qwen3:4b
 OLLAMA_EMBED_MODEL=bge-m3
@@ -130,7 +130,7 @@ services:
       POSTGRES_PASSWORD: portal
       POSTGRES_DB: portal
     ports:
-      - "5433:5432"
+      - "55432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -320,7 +320,7 @@ class Settings:
 
 def load_settings() -> Settings:
     return Settings(
-        database_url=os.environ.get("DATABASE_URL", "postgresql://portal:portal@localhost:5433/portal"),
+        database_url=os.environ.get("DATABASE_URL", "postgresql://portal:portal@localhost:55432/portal"),
         ollama_url=os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/"),
         embed_model=os.environ.get("OLLAMA_EMBED_MODEL", "bge-m3"),
         openalex_api_key=os.environ.get("OPENALEX_API_KEY") or None,
@@ -399,7 +399,7 @@ import pytest
 
 from ingest.db import apply_migrations, connect
 
-TEST_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://portal:portal@localhost:5433/portal_test")
+TEST_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://portal:portal@localhost:55432/portal_test")
 
 
 @pytest.fixture
