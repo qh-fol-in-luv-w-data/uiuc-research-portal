@@ -1,0 +1,12 @@
+# Always dropped (exact match after normalization). One per line.
+real world
+such information networks
+case study
+et al
+results
+method
+methods
+approach
+study
+paper
+applications
