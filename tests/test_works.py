@@ -83,3 +83,14 @@ def test_truncated_author_list_is_not_flagged_missing_affiliation():
     p = parse_work(make_work(authorships=auths))
     mark_outliers([p])
     assert not p.work["is_outlier"]
+
+
+def test_authorship_without_author_id_still_counts_as_uiuc_evidence():
+    anon = make_author("A0", "Unknown", [UIUC], "University of Illinois Urbana-Champaign")
+    anon["author"]["id"] = None
+    other = make_author("A2", "Ivan P", [HERZEN], "Herzen University", position="last")
+    p = parse_work(make_work(authorships=[anon, other]))
+    assert [a["author_id"] for a in p.authorships] == ["A2"]
+    assert "I157725225" in p.work_institutions
+    mark_outliers([p])
+    assert not p.work["is_outlier"]

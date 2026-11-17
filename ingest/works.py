@@ -50,6 +50,9 @@ class ParsedWork:
     work_institutions: list[str] = field(default_factory=list)
     topics: list[dict] = field(default_factory=list)
     work_topics: list[tuple[str, float]] = field(default_factory=list)
+    # authorships OpenAlex has not attributed to an author id: no author row, but still affiliation evidence
+    unattributed_uiuc: bool = False
+    unattributed_raw: list[str] = field(default_factory=list)
 
 
 def _topic_row(t: dict) -> dict:
@@ -89,9 +92,8 @@ def parse_work(w: dict) -> ParsedWork:
     for a in w.get("authorships") or []:
         au = a.get("author") or {}
         aid = short_id(au.get("id"))
-        if not aid or aid in seen:
+        if aid and aid in seen:
             continue
-        seen.add(aid)
         inst_ids = []
         uiuc = False
         for i in a.get("institutions") or []:
@@ -99,16 +101,24 @@ def parse_work(w: dict) -> ParsedWork:
             if not iid:
                 continue
             inst_ids.append(iid)
+            insts[iid] = {"id": iid, "display_name": i.get("display_name"),
+                          "country_code": i.get("country_code"), "type": i.get("type")}
             # child institutions (institutes, centers) list UIUC in their lineage
             if iid == UIUC_ID or UIUC_ID in {short_id(x) for x in i.get("lineage") or []}:
                 uiuc = True
-            insts[iid] = {"id": iid, "display_name": i.get("display_name"),
-                          "country_code": i.get("country_code"), "type": i.get("type")}
+        raw = "; ".join(a.get("raw_affiliation_strings") or []) or None
+        if not aid:
+            # OpenAlex has not attributed this authorship to an author id yet: no author row,
+            # but its institutions and affiliation still count as evidence for the work
+            p.unattributed_uiuc = p.unattributed_uiuc or uiuc
+            if raw:
+                p.unattributed_raw.append(raw)
+            continue
+        seen.add(aid)
         p.authors.append({"id": aid, "display_name": au.get("display_name") or "", "orcid": au.get("orcid")})
         p.authorships.append({
             "work_id": wid, "author_id": aid, "position": a.get("author_position"),
-            "is_uiuc": uiuc,
-            "raw_affiliation": "; ".join(a.get("raw_affiliation_strings") or []) or None,
+            "is_uiuc": uiuc, "raw_affiliation": raw,
         })
     p.institutions = list(insts.values())
     p.work_institutions = list(insts.keys())
@@ -128,8 +138,9 @@ def mark_outliers(items: list[ParsedWork]) -> dict[str, int]:
     cites = sorted(p.work["cited_by_count"] for p in items)
     p99 = cites[int(0.99 * (len(cites) - 1))] if cites else 0
     for p in items:
-        has_uiuc = any(a["is_uiuc"] for a in p.authorships)
-        mentions = any("illinois" in (a["raw_affiliation"] or "").lower() for a in p.authorships)
+        has_uiuc = p.unattributed_uiuc or any(a["is_uiuc"] for a in p.authorships)
+        raws = [a["raw_affiliation"] or "" for a in p.authorships] + p.unattributed_raw
+        mentions = any("illinois" in r.lower() for r in raws)
         reason = None
         truncated = len(p.authorships) >= TRUNCATED_AUTHORS  # the UIUC author may be cut off
         if not has_uiuc and not mentions and not truncated:
