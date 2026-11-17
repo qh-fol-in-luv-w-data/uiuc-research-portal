@@ -6,3 +6,8 @@ ingest/.cache/
 node_modules/
 .next/
 finetune/models/
+
+# Assessment inputs: not redistributed (personal data / third-party document)
+data/illinois-researchers.csv
+docs/AOLTask.pdf
+db/dump/

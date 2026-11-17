@@ -105,7 +105,7 @@ def render_data_quality(dq_works: dict | None, dq_faculty: dict | None, dq_link:
     lines += ["", "## Faculty", "",
               f"- Rows: {f.get('rows', 'n/a')}; missing photo: {f.get('missing_photo', 'n/a')};"
               f" missing position: {f.get('missing_position', 'n/a')}",
-              f"- Duplicate emails in CSV (first row kept): {', '.join(f.get('duplicate_emails') or []) or 'none'}",
+              f"- Duplicate emails in CSV (first row kept): {len(f.get('duplicate_emails') or [])}",
               f"- Median keywords per person: raw {f.get('keywords_raw_median', 'n/a')} →"
               f" cleaned {f.get('keywords_clean_median', 'n/a')}",
               "", "## Faculty ↔ OpenAlex author links", "",
