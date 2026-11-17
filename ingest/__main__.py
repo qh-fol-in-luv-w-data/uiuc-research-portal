@@ -14,7 +14,8 @@ from .embedder import EmbedderUnavailable, OllamaEmbedder
 from .faculty import load_faculty
 from .linking import embed_profiles, link_faculty
 from .load_works import load_works
-from .openalex import OpenAlexClient, QuotaExhausted, page_dir_for, read_cached_results, resolve_filter
+from .openalex import (OpenAlexClient, QuotaExhausted, SliceTooLarge, month_slices, page_dir_for,
+                       read_cached_results, resolve_filter)
 
 STEPS = ["fetch-works", "clean-works", "load-faculty", "embed-profiles", "link-faculty", "embed", "aggregate"]
 
@@ -35,11 +36,13 @@ def run_step(step: str, s, conn, http: httpx.Client, force: bool, refresh: bool)
     if step == "fetch-works":
         client = OpenAlexClient(http, s.cache_dir, api_key=s.openalex_api_key, mailto=s.openalex_mailto)
         total = 0
-        for page in client.iter_pages(filter_str):
-            total += len(page)
-            print(f"fetch-works: {total} works", flush=True)
+        for sl in month_slices(filter_str):
+            for page in client.iter_pages(sl):
+                total += len(page)
+            print(f"fetch-works: {total} works (through {sl.rsplit('from_publication_date:', 1)[1]})", flush=True)
     elif step == "clean-works":
-        print(load_works(conn, read_cached_results(page_dir_for(s.cache_dir, filter_str))))
+        raw = (w for sl in month_slices(filter_str) for w in read_cached_results(page_dir_for(s.cache_dir, sl)))
+        print(load_works(conn, raw))
     elif step == "load-faculty":
         print(load_faculty(conn, s.data_dir / "illinois-researchers.csv", s.data_dir))
     elif step == "embed-profiles":
@@ -68,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"== {step}", flush=True)
                 run_step(step, s, conn, http, args.force, args.refresh_filter)
         return 0
-    except QuotaExhausted as exc:
+    except (QuotaExhausted, SliceTooLarge) as exc:
         print(f"STOPPED: {exc}", file=sys.stderr)
         return 2
     except EmbedderUnavailable as exc:

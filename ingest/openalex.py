@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Callable, Iterator
 
@@ -19,16 +19,47 @@ WORK_FIELDS = [
 ]
 
 
+PAGE_LIMIT = 10000  # OpenAlex basic paging (page=) cannot go past 10,000 results per query
+
+
 class QuotaExhausted(RuntimeError):
     pass
 
 
-def works_filter(today: date) -> str:
+class SliceTooLarge(RuntimeError):
+    pass
+
+
+def _years_shift(d: date, years: int) -> date:
     try:
-        start = today.replace(year=today.year - 2)
+        return d.replace(year=d.year + years)
     except ValueError:  # Feb 29
-        start = today.replace(year=today.year - 2, day=28)
-    return f"institutions.id:{UIUC_ID},from_publication_date:{start.isoformat()}"
+        return d.replace(year=d.year + years, day=28)
+
+
+def works_filter(today: date) -> str:
+    return f"institutions.id:{UIUC_ID},from_publication_date:{_years_shift(today, -2).isoformat()}"
+
+
+def month_slices(base_filter: str) -> list[str]:
+    """Split a 2-year `from_publication_date` window into calendar-month filters.
+
+    Cursor paging needs an API key, and page-number paging stops at 10,000 results, so each
+    month (~1,100 UIUC works) is paged separately. The last slice is open-ended so that
+    future-dated publications are still included.
+    """
+    prefix, _, start = base_filter.rpartition("from_publication_date:")
+    cur = date.fromisoformat(start)
+    end = _years_shift(cur, 2)
+    slices = []
+    while True:
+        nxt = (cur.replace(day=1) + timedelta(days=32)).replace(day=1)
+        if nxt > end:
+            slices.append(f"{prefix}from_publication_date:{cur.isoformat()}")
+            return slices
+        slices.append(f"{prefix}from_publication_date:{cur.isoformat()},"
+                      f"to_publication_date:{(nxt - timedelta(days=1)).isoformat()}")
+        cur = nxt
 
 
 def resolve_filter(cache_dir: Path, today: date, refresh: bool = False) -> str:
@@ -91,17 +122,16 @@ class OpenAlexClient:
         raise RuntimeError("unreachable")
 
     def iter_pages(self, filter_str: str, per_page: int = 200) -> Iterator[list[dict]]:
+        """Yield result pages for one filter using page-number paging, cached on disk."""
         page_dir = page_dir_for(self.cache_dir, filter_str)
         page_dir.mkdir(parents=True, exist_ok=True)
-        cursor: str | None = "*"
-        n = 0
+        next_page: int | None = 1
         for path in _cached_pages(page_dir):
-            page = json.loads(path.read_text())
-            yield page["results"]
-            cursor = page["next_cursor"]
-            n += 1
-        while cursor is not None:
-            params = {"filter": filter_str, "per_page": per_page, "cursor": cursor,
+            cached = json.loads(path.read_text())
+            yield cached["results"]
+            next_page = cached["next_page"]
+        while next_page is not None:
+            params = {"filter": filter_str, "per_page": per_page, "page": next_page,
                       "select": ",".join(WORK_FIELDS)}
             if self.api_key:
                 params["api_key"] = self.api_key
@@ -110,15 +140,17 @@ class OpenAlexClient:
             resp = self._get(params)
             body = resp.json()
             results = body.get("results") or []
-            next_cursor = body.get("meta", {}).get("next_cursor") if results else None
-            tmp = page_dir / f"page-{n:05d}.json.tmp"
-            tmp.write_text(json.dumps({"cursor": cursor, "next_cursor": next_cursor, "results": results}))
-            tmp.rename(page_dir / f"page-{n:05d}.json")
+            count = int((body.get("meta") or {}).get("count") or 0)
+            if count > PAGE_LIMIT:
+                raise SliceTooLarge(f"{count} results for {filter_str!r}; split the date range further")
+            nxt = next_page + 1 if results and next_page * per_page < count else None
+            tmp = page_dir / f"page-{next_page:05d}.json.tmp"
+            tmp.write_text(json.dumps({"page": next_page, "next_page": nxt, "count": count, "results": results}))
+            tmp.rename(page_dir / f"page-{next_page:05d}.json")
             yield results
-            n += 1
-            cursor = next_cursor
+            next_page = nxt
             remaining = resp.headers.get("x-ratelimit-remaining-usd")
-            if cursor is not None and remaining is not None and float(remaining) < self.min_remaining_usd:
+            if next_page is not None and remaining is not None and float(remaining) < self.min_remaining_usd:
                 raise QuotaExhausted(
                     f"OpenAlex budget nearly exhausted (remaining ${remaining}). "
                     f"Re-run later or set OPENALEX_API_KEY; progress cached in {page_dir}.")
