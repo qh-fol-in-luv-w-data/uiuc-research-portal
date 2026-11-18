@@ -125,3 +125,12 @@ def test_citations_predating_publication_flag_reissued_work():
     assert items[0].work["outlier_reason"] == "citations_predate_publication"
     assert not items[1].work["is_outlier"]
     assert counts["citations_predate_publication"] == 1
+
+
+def test_journal_version_of_recent_preprint_is_not_a_reissue():
+    w = make_work(id="WJ", date="2026-01-01", cited=213)
+    w["counts_by_year"] = [{"year": 2024, "cited_by_count": 28}, {"year": 2025, "cited_by_count": 100},
+                           {"year": 2026, "cited_by_count": 85}]
+    items = [parse_work(w)]
+    mark_outliers(items)
+    assert not items[0].work["is_outlier"]  # 13% of citations predate, earliest only 2 years before

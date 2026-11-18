@@ -141,6 +141,18 @@ def parse_work(w: dict, uiuc_units: frozenset[str] = frozenset({UIUC_ID})) -> Pa
     return p
 
 
+def _is_reissue(p: ParsedWork) -> bool:
+    """A reissue of an older work: most citations predate the publication year by 2+ years and the
+    earliest citation is 3+ years earlier. A journal version of a recent preprint stays a new work
+    (calibrated 2026-11-18 on the 462 works with any predating citation)."""
+    total = sum(p.citations_by_year.values())
+    if not p.publication_year or total == 0:
+        return False
+    pre = sum(n for y, n in p.citations_by_year.items() if y <= p.publication_year - 2)
+    earliest = min(y for y, n in p.citations_by_year.items() if n > 0)
+    return pre / total >= 0.5 and p.publication_year - earliest >= 3
+
+
 def mark_outliers(items: list[ParsedWork]) -> dict[str, int]:
     counts = {"no_uiuc_affiliation": 0, "non_english_high_citation": 0, "citations_predate_publication": 0}
     cites = sorted(p.work["cited_by_count"] for p in items)
@@ -155,8 +167,7 @@ def mark_outliers(items: list[ParsedWork]) -> dict[str, int]:
             reason = "no_uiuc_affiliation"
         elif p.work["language"] not in (None, "en") and p99 > 0 and p.work["cited_by_count"] >= p99:
             reason = "non_english_high_citation"
-        elif p.publication_year and any(n > 0 and y <= p.publication_year - 2 for y, n in p.citations_by_year.items()):
-            # cited two or more years before it was "published": a reissue of an older work
+        elif _is_reissue(p):
             reason = "citations_predate_publication"
         if reason:
             p.work["is_outlier"] = True
