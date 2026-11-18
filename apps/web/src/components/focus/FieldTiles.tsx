@@ -1,7 +1,5 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
-
 import { fmt } from "@/lib/format";
 import type { StatsData } from "@/lib/types";
 import { useField } from "@/lib/useField";
@@ -10,7 +8,6 @@ const SHADES = ["bg-navy", "bg-navy-2", "bg-navy-2", "bg-navy-2", "bg-navy-3"];
 
 export function FieldTiles({ fields }: { fields: StatsData["fields"] }) {
   const [field, setField] = useField();
-  const reduce = useReducedMotion();
   const shown = fields.slice(0, 12);
   return (
     <div className="flex flex-col gap-3">
@@ -32,15 +29,10 @@ export function FieldTiles({ fields }: { fields: StatsData["fields"] }) {
           const on = field === f.field;
           const dim = field !== null && !on;
           return (
-            <motion.li
+            <li
               key={f.field}
-              layout={!reduce}
-              initial={reduce ? false : { opacity: 0, scale: 0.94 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45, delay: reduce ? 0 : i * 0.04, ease: [0.22, 1, 0.36, 1] }}
-              style={{ flex: `${f.count} 1 ${Math.max(150, Math.round(f.count / 14))}px` }}
-              className="min-w-0"
+              style={{ flex: `${f.count} 1 ${Math.max(150, Math.round(f.count / 14))}px`, "--d": i * 0.04 } as React.CSSProperties}
+              className="reveal min-w-0"
             >
               <button
                 type="button"
@@ -54,7 +46,7 @@ export function FieldTiles({ fields }: { fields: StatsData["fields"] }) {
                 <span className="tabular font-mono text-[13px] opacity-85">{fmt(f.count)} works</span>
                 <span className="line-clamp-1 text-xs opacity-80">Top: {f.subfields[0]?.name}</span>
               </button>
-            </motion.li>
+            </li>
           );
         })}
       </ul>

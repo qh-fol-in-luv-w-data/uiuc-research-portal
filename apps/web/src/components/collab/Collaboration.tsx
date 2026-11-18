@@ -14,7 +14,7 @@ export function Collaboration({ partners, mapPoints, partnerCount, institution }
 }) {
   const photo = institution?.images?.[1] ?? institution?.images?.[0];
   return (
-    <section id="collab" aria-labelledby="collab-title" className="cv-auto flex scroll-mt-24 flex-col gap-6">
+    <section id="collab" aria-labelledby="collab-title" className="flex scroll-mt-24 flex-col gap-6">
       <SectionHeading id="collab" title="Collaboration & campus"
         intro={`UIUC co-authored with ${fmt(partnerCount)} other institutions. Illinois institutes such as NCSA and the Carl R. Woese Institute count as UIUC, not as partners.`} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">

@@ -18,7 +18,7 @@ export function Output({ monthly, types, venues, oaShare }: {
   const partial = series.at(-1)?.month === today ? today : null;
   const total = types.reduce((a, t) => a + t.count, 0);
   return (
-    <section id="output" aria-labelledby="output-title" className="cv-auto flex scroll-mt-24 flex-col gap-6">
+    <section id="output" aria-labelledby="output-title" className="flex scroll-mt-24 flex-col gap-6">
       <SectionHeading id="output" title="Scholarly output"
         intro="About a thousand works a month. January peaks include works OpenAlex dates only by year, which it files under 1 January." />
       <Reveal className="overflow-x-auto rounded-2xl border border-line bg-surface p-5">

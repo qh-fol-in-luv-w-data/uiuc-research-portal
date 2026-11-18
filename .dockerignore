@@ -1,0 +1,11 @@
+.venv
+**/__pycache__
+.pytest_cache
+.git
+ingest/.cache
+apps/web
+db/dump
+docs
+tests
+finetune
+data/illinois-researchers.csv

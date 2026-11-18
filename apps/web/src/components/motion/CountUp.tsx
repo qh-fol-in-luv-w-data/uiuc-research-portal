@@ -1,7 +1,9 @@
 "use client";
 
-import { animate, useInView, useReducedMotion } from "motion/react";
+import { animate, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+
+import { useNearViewport } from "@/lib/useNearViewport";
 
 // Server components pass a format *name*: functions cannot cross the server/client boundary.
 type Kind = "int" | "percent";
@@ -16,7 +18,7 @@ const FORMATS: Record<Kind, (n: number) => string> = {
 export function CountUp({ value, kind = "int", duration = 0.9, className }: Props) {
   const format = FORMATS[kind];
   const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true });
+  const inView = useNearViewport(ref);
   const reduce = useReducedMotion();
   const [shown, setShown] = useState(reduce ? value : 0);
 

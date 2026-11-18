@@ -79,12 +79,12 @@ export default function Page() {
       <main id="main" className="mx-auto flex max-w-7xl flex-col gap-24 px-[max(16px,env(safe-area-inset-left,0px))] pb-24 sm:px-6">
         <Suspense fallback={<Skeleton h="h-[560px]" />}><FocusData /></Suspense>
         <Suspense fallback={<Skeleton />}><OutputData /></Suspense>
-        <section id="notable" aria-labelledby="notable-title" className="cv-auto flex scroll-mt-24 flex-col gap-6">
+        <section id="notable" aria-labelledby="notable-title" className="flex scroll-mt-24 flex-col gap-6">
           <SectionHeading id="notable" title="Notable publications"
             intro="The most cited and the newest UIUC works. Names in bold are faculty in the directory; select one to open their profile." />
           <Suspense fallback={<Skeleton />}><NotableData /></Suspense>
         </section>
-        <section id="faculty" aria-labelledby="faculty-title" className="cv-auto flex scroll-mt-24 flex-col gap-6">
+        <section id="faculty" aria-labelledby="faculty-title" className="flex scroll-mt-24 flex-col gap-6">
           <SectionHeading id="faculty" title="Faculty expertise"
             intro="Search 999 faculty profiles by research keyword. Profiles linked to OpenAlex also show topics and recent publications." />
           <Suspense fallback={<Skeleton />}><FacultySearch /></Suspense>

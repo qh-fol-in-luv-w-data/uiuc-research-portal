@@ -10,7 +10,7 @@ const LINKS = [
 
 export function Header() {
   return (
-    <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-navy/95 text-hero-ink backdrop-blur supports-[backdrop-filter]:bg-navy/85">
+    <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-navy text-hero-ink shadow-[0_1px_0_rgb(255_255_255/0.08)]">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-7 gap-y-2 px-[max(16px,env(safe-area-inset-left,0px))] py-3 sm:px-6">
         <a href="#top" className="flex items-center gap-2.5 font-semibold tracking-wide">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent font-display text-lg font-bold text-navy">I</span>

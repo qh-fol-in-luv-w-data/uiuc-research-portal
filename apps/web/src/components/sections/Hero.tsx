@@ -19,8 +19,9 @@ export function Hero({ overview }: { overview: Overview }) {
       {/* depth 0: grid texture */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-[0.18] [background-image:linear-gradient(var(--hero-muted)_1px,transparent_1px),linear-gradient(90deg,var(--hero-muted)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_70%_30%,black,transparent_70%)]" />
       {/* depth 1: glow */}
-      <div aria-hidden="true" className="drift-loop pointer-events-none absolute -right-40 -top-40 -z-10 h-[520px] w-[520px] rounded-full bg-accent/25 blur-3xl" />
-      <div aria-hidden="true" className="drift-loop pointer-events-none absolute -bottom-48 -left-32 -z-10 h-[460px] w-[460px] rounded-full bg-navy-3/60 blur-3xl [animation-delay:-6s]" />
+      {/* radial gradients instead of filter: blur, so the drift animation stays on the compositor */}
+      <div aria-hidden="true" className="drift-loop pointer-events-none absolute -right-56 -top-56 -z-10 h-[760px] w-[760px] rounded-full bg-[radial-gradient(closest-side,rgb(255_95_5/0.28),transparent)] will-change-transform" />
+      <div aria-hidden="true" className="drift-loop pointer-events-none absolute -bottom-64 -left-48 -z-10 h-[680px] w-[680px] rounded-full bg-[radial-gradient(closest-side,rgb(45_78_133/0.7),transparent)] will-change-transform [animation-delay:-6s]" />
 
       <div className="mx-auto grid max-w-7xl items-end gap-10 px-[max(16px,env(safe-area-inset-left,0px))] pb-12 pt-14 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:pt-20">
         <div className="flex min-w-0 flex-col gap-5">
@@ -40,7 +41,7 @@ export function Hero({ overview }: { overview: Overview }) {
         </div>
         {/* depth 3: main visual with parallax + float loop */}
         <Parallax speed={0.18} className="min-w-0">
-          <div className="float-loop">
+          <div className="float-loop will-change-transform">
             <CampusVisual institution={overview.institution} />
           </div>
         </Parallax>
@@ -49,7 +50,7 @@ export function Hero({ overview }: { overview: Overview }) {
       <ul className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-[max(16px,env(safe-area-inset-left,0px))] pb-14 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
         {kpis.map((k, i) => (
           <Reveal as="li" key={k.label} delay={0.5 + i * 0.07}
-                  className="flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur-sm">
+                  className="flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] p-5">
             <span className="text-sm text-hero-muted">{k.label}</span>
             <CountUp
               value={k.value}
