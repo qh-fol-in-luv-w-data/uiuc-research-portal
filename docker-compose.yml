@@ -1,10 +1,8 @@
-# One command: `docker compose up -d` (or `make up`) builds everything, loads the data and pulls the
-# Ollama models on first run, then serves the portal on http://localhost:${WEB_PORT:-3000}.
+# One command: `docker compose up -d` pulls the prebuilt images (data included) from GHCR, pulls the
+# Ollama models on first run, and serves the portal on http://localhost:${WEB_PORT:-3000}.
+# Developers rebuild everything from source with `docker compose build`.
 x-api-image: &api-image
-  build:
-    context: .
-    dockerfile: apps/api/Dockerfile
-  image: uiuc-research-portal-api:latest
+  image: ghcr.io/qh-fol-in-luv-w-data/uiuc-research-portal-api:${PORTAL_TAG:-latest}
   extra_hosts:
     - "host.docker.internal:host-gateway"
 
@@ -18,21 +16,22 @@ x-api-env: &api-env
 
 services:
   db:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_USER: portal
-      POSTGRES_PASSWORD: portal
-      POSTGRES_DB: portal
+    # pgvector + the portal database restored automatically on first start (see db/Dockerfile)
+    build:
+      context: db
+    image: ghcr.io/qh-fol-in-luv-w-data/uiuc-research-portal-db:${PORTAL_TAG:-latest}
     ports:
       - "${DB_PORT:-55432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portal -d portal"]
+      # TCP, not the socket: during the first-start restore the entrypoint's temporary server
+      # answers on the socket only, so this turns healthy once the data is actually loaded
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U portal -d portal"]
       interval: 5s
       timeout: 3s
-      retries: 20
+      retries: 60
+      start_period: 10m  # first start restores the baked-in data (a few minutes)
 
   # One-shot first-run setup: schema, data (dump restore, or full ingest as fallback), Ollama models.
   # Does nothing on later runs when the data and models are already there.
@@ -54,6 +53,9 @@ services:
 
   api:
     <<: *api-image
+    build:  # only this service builds the image; `setup` reuses it
+      context: .
+      dockerfile: apps/api/Dockerfile
     environment:
       <<: *api-env
     ports:
@@ -65,7 +67,7 @@ services:
   web:
     build:
       context: apps/web
-    image: uiuc-research-portal-web:latest
+    image: ghcr.io/qh-fol-in-luv-w-data/uiuc-research-portal-web:${PORTAL_TAG:-latest}
     environment:
       API_URL: http://api:8010
     ports:
