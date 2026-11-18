@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import date
 
 import httpx
 
 from .aggregate import aggregate
+from .bootstrap import bootstrap
 from .config import load_settings
 from .db import apply_migrations, connect
 from .embed import embed_faculty, embed_works
@@ -26,7 +28,7 @@ STEPS = ["fetch-works", "clean-works", "load-faculty", "embed-profiles", "link-f
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m ingest", description="UIUC portal ingest pipeline")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ["migrate", *STEPS, "all"]:
+    for name in ["migrate", *STEPS, "all", "bootstrap"]:
         sp = sub.add_parser(name)
         sp.add_argument("--force", action="store_true", help="recompute embeddings from scratch")
         sp.add_argument("--refresh-filter", action="store_true", help="recompute the 2-year window from today")
@@ -73,6 +75,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         steps = STEPS if args.cmd == "all" else [args.cmd]
         with httpx.Client(headers={"User-Agent": "uiuc-research-portal-ingest"}) as http:
+            if args.cmd == "bootstrap":
+                def full_ingest() -> None:
+                    for step in STEPS:
+                        print(f"== {step}", flush=True)
+                        run_step(step, s, conn, http, False, False)
+                print(bootstrap(conn, http, database_url=s.database_url, ollama_url=s.ollama_url,
+                                models=[os.environ.get("OLLAMA_CHAT_MODEL", "qwen3:4b"), s.embed_model],
+                                dump_path=s.data_dir.parent / "db" / "dump" / "portal.sql.gz",
+                                dump_url=os.environ.get("DUMP_URL", ""), run_full_ingest=full_ingest), flush=True)
+                return 0
             for step in steps:
                 print(f"== {step}", flush=True)
                 run_step(step, s, conn, http, args.force, args.refresh_filter)

@@ -8,23 +8,24 @@ A single-page research portal for the University of Illinois Urbana-Champaign, b
 
 ## Quickstart
 
-Prerequisites: Docker, and [Ollama](https://ollama.com) running on the host with the models pulled:
+Prerequisites: Docker, and [Ollama](https://ollama.com) installed and running on the host (it uses the GPU there).
 
 ```bash
-ollama pull qwen3:4b && ollama pull bge-m3
-```
-
-Then:
-
-```bash
-make restore   # load the prebuilt database (db/dump/portal.sql.gz, see "Database dump")
-make up        # build and start db, api, web
+git clone https://github.com/qh-fol-in-luv-w-data/uiuc-research-portal.git && cd uiuc-research-portal
+docker compose up -d        # or: make up
 open http://localhost:3000
 ```
 
-Ports: web `3000`, API `8010`, Postgres `55432`. Override any of them, e.g. `make up WEB_PORT=3100`.
+On the first run a one-shot `setup` service does everything else, then exits:
 
-To rebuild the database from scratch instead of restoring it (about 40 minutes, mostly embeddings), put the provided `illinois-researchers.csv` in `data/` and run `make ingest`.
+1. **Data**: if the database is empty, it restores the prebuilt dump (`db/dump/portal.sql.gz`, or the URL in `DUMP_URL`). With no dump available it runs the full ingest from OpenAlex instead (about 40 minutes, mostly embeddings), which needs the provided `illinois-researchers.csv` in `data/`.
+2. **Models**: it pulls `qwen3:4b` and `bge-m3` into Ollama if they are missing (a one-time download of about 4 GB). If Ollama is not running, the portal still works and the assistant shows as offline.
+
+Later runs skip both steps. Follow progress with `docker compose logs -f setup`.
+
+No Ollama on the host? Run a bundled one (CPU only inside Docker on macOS, so slow): `OLLAMA_URL=http://ollama:11434 docker compose --profile ollama up -d`.
+
+Ports: web `3000`, API `8010`, Postgres `55432`. Override any of them, e.g. `WEB_PORT=3100 docker compose up -d`.
 
 ## Architecture
 
