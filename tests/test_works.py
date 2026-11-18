@@ -53,7 +53,7 @@ def test_mark_outliers_flags_non_english_top_citation_and_missing_affiliation():
     assert stray.work["is_outlier"] and stray.work["outlier_reason"] == "no_uiuc_affiliation"
     assert not mention.work["is_outlier"]
     assert not items[-1].work["is_outlier"]  # top English paper is not an outlier
-    assert counts == {"no_uiuc_affiliation": 1, "non_english_high_citation": 1}
+    assert counts == {"no_uiuc_affiliation": 1, "non_english_high_citation": 1, "citations_predate_publication": 0}
 
 
 def test_cap_by_date_keeps_newest():
@@ -104,3 +104,24 @@ def test_truncated_list_counted_before_dropping_unattributed():
     assert p.raw_authorship_count == 100
     mark_outliers([p])
     assert not p.work["is_outlier"]
+
+
+def test_curated_unit_authorship_counts_as_uiuc():
+    woese = {"id": "https://openalex.org/I4405271866", "display_name": "Carl R. Woese Institute for Genomic Biology",
+             "country_code": "US", "type": "facility", "lineage": ["https://openalex.org/I4405271866"]}
+    p = parse_work(make_work(authorships=[make_author("A1", "X Y", [woese], "IGB")]),
+                   uiuc_units=frozenset({"I157725225", "I4405271866"}))
+    assert p.authorships[0]["is_uiuc"] is True
+    assert p.institutions[0]["is_uiuc_unit"] is True
+
+
+def test_citations_predating_publication_flag_reissued_work():
+    old = make_work(id="WOLD", date="2026-04-29", cited=1633)
+    old["counts_by_year"] = [{"year": 2026, "cited_by_count": 50}, {"year": 2019, "cited_by_count": 120}]
+    online_first = make_work(id="WNEW", date="2026-01-10", cited=40)
+    online_first["counts_by_year"] = [{"year": 2025, "cited_by_count": 40}]
+    items = [parse_work(old), parse_work(online_first)]
+    counts = mark_outliers(items)
+    assert items[0].work["outlier_reason"] == "citations_predate_publication"
+    assert not items[1].work["is_outlier"]
+    assert counts["citations_predate_publication"] == 1

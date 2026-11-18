@@ -1,0 +1,12 @@
+# UIUC institutes that OpenAlex records as separate institutions without linking them to
+# UIUC (no lineage, not in associated_institutions). Authorships at these count as UIUC and
+# they are excluded from "partner institutions". OpenAlex child institutions of UIUC are
+# added automatically by `ingest/units.py`.
+- id: I4405271866
+  name: Carl R. Woese Institute for Genomic Biology
+- id: I4405273005
+  name: Prairie Research Institute
+- id: I4405270296
+  name: Illinois Natural History Survey   # division of the Prairie Research Institute
+- id: I4405270447
+  name: Cancer Center at Illinois

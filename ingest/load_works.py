@@ -6,10 +6,12 @@ from typing import Iterable
 import psycopg
 
 from .db import put_stat
-from .works import ParsedWork, cap_by_date, drop_reason, mark_outliers, parse_work
+from .dedupe import mark_duplicates
+from .works import UIUC_ID, ParsedWork, cap_by_date, drop_reason, mark_outliers, parse_work
 
 WORK_COLS = ["id", "doi", "title", "abstract", "publication_date", "type", "language", "cited_by_count",
-             "is_oa", "oa_url", "venue_name", "venue_type", "primary_topic_id", "is_outlier", "outlier_reason"]
+             "is_oa", "oa_url", "venue_name", "venue_type", "primary_topic_id", "is_outlier", "outlier_reason",
+             "duplicate_of"]
 
 
 def upsert_parsed(conn: psycopg.Connection, items: list[ParsedWork]) -> None:
@@ -27,10 +29,11 @@ def upsert_parsed(conn: psycopg.Connection, items: list[ParsedWork]) -> None:
             " subfield = EXCLUDED.subfield, field = EXCLUDED.field, domain = EXCLUDED.domain",
             list(topics.values()))
         cur.executemany(
-            "INSERT INTO institutions (id, display_name, country_code, type)"
-            " VALUES (%(id)s, %(display_name)s, %(country_code)s, %(type)s)"
+            "INSERT INTO institutions (id, display_name, country_code, type, is_uiuc_unit)"
+            " VALUES (%(id)s, %(display_name)s, %(country_code)s, %(type)s, %(is_uiuc_unit)s)"
             " ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name,"
-            " country_code = EXCLUDED.country_code, type = EXCLUDED.type",
+            " country_code = EXCLUDED.country_code, type = EXCLUDED.type,"
+            " is_uiuc_unit = institutions.is_uiuc_unit OR EXCLUDED.is_uiuc_unit",
             list(insts.values()))
         cur.executemany(
             "INSERT INTO authors (id, display_name, orcid) VALUES (%(id)s, %(display_name)s, %(orcid)s)"
@@ -57,7 +60,8 @@ def upsert_parsed(conn: psycopg.Connection, items: list[ParsedWork]) -> None:
     conn.commit()
 
 
-def load_works(conn: psycopg.Connection, raw_works: Iterable[dict], cap: int = 25000) -> dict:
+def load_works(conn: psycopg.Connection, raw_works: Iterable[dict], cap: int = 25000,
+               uiuc_units: frozenset[str] = frozenset({UIUC_ID})) -> dict:
     fetched = duplicates = 0
     dropped: Counter[str] = Counter()
     seen: set[str] = set()
@@ -72,12 +76,13 @@ def load_works(conn: psycopg.Connection, raw_works: Iterable[dict], cap: int = 2
         if reason:
             dropped[reason] += 1
             continue
-        parsed.append(parse_work(w))
+        parsed.append(parse_work(w, uiuc_units))
     outliers = mark_outliers(parsed)
+    versions = mark_duplicates(parsed)
     kept_before_cap = len(parsed)
     parsed = cap_by_date(parsed, limit=cap)
     upsert_parsed(conn, parsed)
     report = {"fetched": fetched, "duplicates": duplicates, "dropped": dict(dropped), "kept": len(parsed),
-              "outliers": outliers, "capped": kept_before_cap - len(parsed)}
+              "outliers": outliers, "duplicate_versions": versions, "capped": kept_before_cap - len(parsed)}
     put_stat(conn, "dq_works", report)
     return report

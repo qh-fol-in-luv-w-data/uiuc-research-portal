@@ -6,13 +6,13 @@ from tests.factories import HERZEN, UIUC, UISYS, make_author, make_topic, make_w
 
 def test_aggregate_stats(db, tmp_path):
     works = [
-        make_work(id="W1", date="2025-01-10", cited=5, authorships=[
+        make_work(id="W1", title="Paper one", date="2025-01-10", cited=5, authorships=[
             make_author("A1", "Jane Doe", [UIUC, UISYS], "UIUC"),
             make_author("A2", "Ivan P", [HERZEN], "Herzen", position="last")]),
-        make_work(id="W2", date="2025-01-20", cited=7, source_type="conference", type="other"),
-        make_work(id="W3", date="2025-02-01", cited=1, topic=make_topic("T2", "Organic Synthesis",
+        make_work(id="W2", title="Paper two", date="2025-01-20", cited=7, source_type="conference", type="other"),
+        make_work(id="W3", title="Paper three", date="2025-02-01", cited=1, topic=make_topic("T2", "Organic Synthesis",
                   "Organic Chemistry", "Chemistry", "Physical Sciences")),
-        make_work(id="W4", authorships=[make_author("A3", "Q", [HERZEN], "Herzen")]),  # outlier
+        make_work(id="W4", title="Paper four", authorships=[make_author("A3", "Q", [HERZEN], "Herzen")]),  # outlier
     ]
     load_works(db, works)
     with db.cursor() as cur:
@@ -39,3 +39,18 @@ def test_aggregate_stats(db, tmp_path):
         assert cur.fetchone()[0] == "Computer Science"
     report = (tmp_path / "data-quality.md").read_text()
     assert "Link rate" in report and "100.0%" in report
+
+
+def test_partners_exclude_units_and_stats_skip_duplicates(db, tmp_path):
+    woese = {"id": "https://openalex.org/I4405271866", "display_name": "Woese IGB", "country_code": "US",
+             "type": "facility", "lineage": ["https://openalex.org/I4405271866"]}
+    works = [
+        make_work(id="W1", authorships=[make_author("A1", "Jane Doe", [UIUC, woese], "UIUC"),
+                                        make_author("A2", "Ivan P", [HERZEN], "Herzen", position="last")]),
+        make_work(id="W2", type="preprint", authorships=[make_author("A1", "Jane Doe", [UIUC], "UIUC")]),
+    ]
+    load_works(db, works, uiuc_units=frozenset({"I157725225", "I4405271866"}))
+    stats = aggregate(db, tmp_path)
+    assert [p["name"] for p in stats["top_partners"]] == ["Herzen University"]
+    assert stats["overview"]["works"] == 1  # W2 is a duplicate version of W1
+    assert stats["overview"]["duplicates"] == 1
