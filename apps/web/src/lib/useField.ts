@@ -1,23 +1,35 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
-/** The page-wide research-field filter lives in the URL (?field=…) so a filtered view is shareable. */
+/**
+ * Page-wide research-field filter. It lives in the URL (?field=…) so a filtered view is shareable,
+ * but filtering is client-side: the URL is written with the History API and components subscribe
+ * through a tiny external store (no router navigation, no server re-render).
+ */
+const listeners = new Set<() => void>();
+
+function read(): string | null {
+  return new URL(window.location.href).searchParams.get("field");
+}
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  window.addEventListener("popstate", onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("popstate", onChange);
+  };
+}
+
 export function useField(): [string | null, (field: string | null) => void] {
-  const params = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const field = params.get("field");
-  const setField = useCallback(
-    (next: string | null) => {
-      const qs = new URLSearchParams(params.toString());
-      if (next) qs.set("field", next);
-      else qs.delete("field");
-      const s = qs.toString();
-      router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
-    },
-    [params, router, pathname],
-  );
+  const field = useSyncExternalStore(subscribe, read, () => null);
+  const setField = useCallback((next: string | null) => {
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set("field", next);
+    else url.searchParams.delete("field");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    listeners.forEach((l) => l());
+  }, []);
   return [field, setField];
 }

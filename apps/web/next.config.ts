@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 // route handlers (src/app/api/[...path], src/app/health) that read API_URL at request time.
 
 const nextConfig: NextConfig = {
+  output: "standalone", // small self-contained server for the Docker image
   cacheComponents: true,
   partialPrefetching: true,
   productionBrowserSourceMaps: false,

@@ -15,3 +15,5 @@ db/dump/
 # Finetune kit: rsync to the GPU server, not published in git
 finetune/
 .DS_Store
+apps/web/test-results/
+apps/web/playwright-report/

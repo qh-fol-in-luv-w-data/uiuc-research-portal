@@ -10,5 +10,5 @@ export default defineConfig({
       "server-only": fileURLToPath(new URL("./src/test/empty.ts", import.meta.url)),
     },
   },
-  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], include: ["src/**/*.test.{ts,tsx}"] },
+  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], include: ["src/**/*.test.{ts,tsx}"], exclude: ["e2e/**", "node_modules/**"] },
 });
