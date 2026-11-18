@@ -54,3 +54,21 @@ def test_partners_exclude_units_and_stats_skip_duplicates(db, tmp_path):
     assert [p["name"] for p in stats["top_partners"]] == ["Herzen University"]
     assert stats["overview"]["works"] == 1  # W2 is a duplicate version of W1
     assert stats["overview"]["duplicates"] == 1
+
+
+def test_by_field_rising_and_top_faculty(db, tmp_path):
+    chem = make_topic("T2", "Organic Synthesis", "Organic Chemistry", "Chemistry", "Physical Sciences")
+    works = [make_work(id=f"W{i}", title=f"Vision paper {i}", date="2026-06-01") for i in range(3)]
+    works += [make_work(id=f"C{i}", title=f"Chem paper {i}", date="2026-06-01", topic=chem,
+                        authorships=[make_author("A5", "Bob Smith", [UIUC], "UIUC")]) for i in range(10)]
+    load_works(db, works)
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO faculty (id, email, name) VALUES (1, 'j@x', 'John Smith'), (2, 'b@x', 'Bob Smith')")
+        cur.execute("INSERT INTO faculty_author_link VALUES (1, 'A1', 0.9, 'exact'), (2, 'A5', 0.9, 'exact')")
+    db.commit()
+    stats = aggregate(db, tmp_path)
+    by_field = stats["by_field"]
+    assert by_field["Computer Science"]["top_faculty"] == [{"id": 1, "name": "John Smith", "count": 3}]
+    assert by_field["Chemistry"]["top_faculty"] == [{"id": 2, "name": "Bob Smith", "count": 10}]
+    assert by_field["Chemistry"]["rising"][0]["name"] == "Organic Synthesis"
+    assert get_stat(db, "by_field") == by_field

@@ -25,7 +25,7 @@ export type Overview = {
 };
 
 export type StatsKey =
-  | "monthly" | "types" | "fields" | "rising_topics" | "top_venues" | "top_partners" | "top_faculty" | "partner_map";
+  | "monthly" | "types" | "fields" | "rising_topics" | "top_venues" | "top_partners" | "top_faculty" | "partner_map" | "by_field";
 
 export type StatsData = {
   monthly: { month: string; count: number }[];
@@ -35,6 +35,7 @@ export type StatsData = {
   top_venues: { name: string; count: number }[];
   top_partners: { id: string; name: string; country: string | null; count: number }[];
   top_faculty: { id: number; name: string; count: number }[];
+  by_field: Record<string, { rising: StatsData["rising_topics"]; top_faculty: StatsData["top_faculty"] }>;
   partner_map: { id: string; name: string; country: string | null; count: number; lat: number; lon: number; city: string | null }[];
 };
 

@@ -79,6 +79,42 @@ def compute_stats(conn: psycopg.Connection, rising_min: int = 40) -> dict[str, o
     }
 
 
+def _by_field(conn: psycopg.Connection, rising_min: int = 10, per_field: int = 5) -> dict[str, dict]:
+    """Rising topics and most published faculty within each field, for the field filter."""
+    rising = _rows(conn, """
+        WITH b AS (SELECT LEAST(max(publication_date), current_date) AS maxd FROM works
+                   WHERE NOT is_outlier AND duplicate_of IS NULL),
+        c AS (
+          SELECT t.id, t.display_name, t.field,
+            count(*) FILTER (WHERE w.publication_date > b.maxd - interval '12 months') AS recent,
+            count(*) FILTER (WHERE w.publication_date <= b.maxd - interval '12 months'
+                             AND w.publication_date > b.maxd - interval '24 months') AS prior
+          FROM works w JOIN topics t ON t.id = w.primary_topic_id CROSS JOIN b
+          WHERE NOT w.is_outlier AND w.duplicate_of IS NULL AND t.field IS NOT NULL
+          GROUP BY t.id, t.display_name, t.field),
+        r AS (SELECT *, round((recent + 1)::numeric / (prior + 1), 2) AS growth,
+                     row_number() OVER (PARTITION BY field ORDER BY (recent + 1)::numeric / (prior + 1) DESC, recent DESC, id) AS rn
+              FROM c WHERE recent >= %s)
+        SELECT field, id, display_name, recent, prior, growth FROM r WHERE rn <= %s ORDER BY field, rn""",
+        (rising_min, per_field))
+    faculty = _rows(conn, """
+        WITH f AS (
+          SELECT t.field, fa.id, fa.name, count(DISTINCT w.id) AS n FROM faculty fa
+          JOIN faculty_author_link l ON l.faculty_id = fa.id JOIN authorships s ON s.author_id = l.author_id
+          JOIN works w ON w.id = s.work_id JOIN topics t ON t.id = w.primary_topic_id
+          WHERE NOT w.is_outlier AND w.duplicate_of IS NULL AND t.field IS NOT NULL
+          GROUP BY t.field, fa.id, fa.name),
+        r AS (SELECT *, row_number() OVER (PARTITION BY field ORDER BY n DESC, name) AS rn FROM f)
+        SELECT field, id, name, n FROM r WHERE rn <= %s ORDER BY field, rn""", (per_field,))
+    out: dict[str, dict] = {}
+    for field, tid, name, recent, prior, growth in rising:
+        out.setdefault(field, {"rising": [], "top_faculty": []})["rising"].append(
+            {"id": tid, "name": name, "field": field, "recent": recent, "prior": prior, "growth": float(growth)})
+    for field, fid, name, n in faculty:
+        out.setdefault(field, {"rising": [], "top_faculty": []})["top_faculty"].append({"id": fid, "name": name, "count": n})
+    return out
+
+
 def _update_derived(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute("""
@@ -127,6 +163,7 @@ def render_data_quality(dq_works: dict | None, dq_faculty: dict | None, dq_link:
 def aggregate(conn: psycopg.Connection, docs_dir: Path) -> dict:
     _update_derived(conn)
     stats = compute_stats(conn)
+    stats["by_field"] = _by_field(conn)
     for key, payload in stats.items():
         put_stat(conn, key, payload)
     docs_dir.mkdir(parents=True, exist_ok=True)

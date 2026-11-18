@@ -18,6 +18,8 @@ test.describe("portal", () => {
     await page.goto("/");
     await page.locator("#focus").getByRole("button", { name: /^Medicine/ }).click();
     await expect(page).toHaveURL(/field=Medicine/);
+    await expect(page.getByRole("heading", { name: "Subfields of Medicine" })).toBeVisible();
+    await expect(page.locator("#focus").getByRole("status")).toContainText("works in Medicine");
     await expect(page.locator("#notable-panel article p").first()).toContainText("Medicine");
     await page.getByRole("button", { name: /Clear filter/ }).click();
     await expect(page).not.toHaveURL(/field=/);

@@ -21,7 +21,7 @@ export function FieldTiles({ fields }: { fields: StatsData["fields"] }) {
             Showing <strong>{field}</strong> across the page · Clear filter
           </button>
         ) : (
-          <p className="text-sm text-muted">Select a field to filter notable publications and faculty below.</p>
+          <p className="text-sm text-muted">Select a field to see its subfields, rising topics and leading faculty, and to filter the page.</p>
         )}
       </div>
       <ul className="flex flex-wrap gap-1.5" aria-label="Research fields by number of publications">
