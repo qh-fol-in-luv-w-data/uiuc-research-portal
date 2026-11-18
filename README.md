@@ -12,16 +12,21 @@ Prerequisites: Docker, and [Ollama](https://ollama.com) installed and running on
 
 ```bash
 git clone https://github.com/qh-fol-in-luv-w-data/uiuc-research-portal.git && cd uiuc-research-portal
-docker compose up -d        # or: make up
+docker compose up -d
 open http://localhost:3000
 ```
 
-On the first run a one-shot `setup` service does everything else, then exits:
+That's all. Docker pulls three prebuilt images from GitHub Container Registry (amd64 and arm64):
 
-1. **Data**: if the database is empty, it restores the prebuilt dump (`db/dump/portal.sql.gz`, or the URL in `DUMP_URL`). With no dump available it runs the full ingest from OpenAlex instead (about 40 minutes, mostly embeddings), which needs the provided `illinois-researchers.csv` in `data/`.
-2. **Models**: it pulls `qwen3:4b` and `bge-m3` into Ollama if they are missing (a one-time download of about 4 GB). If Ollama is not running, the portal still works and the assistant shows as offline.
+| Image | Contents |
+|---|---|
+| `uiuc-research-portal-db` | Postgres 16 + pgvector **with the full portal database baked in**, restored automatically on first start |
+| `uiuc-research-portal-api` | FastAPI service and the ingest CLI |
+| `uiuc-research-portal-web` | Next.js portal |
 
-Later runs skip both steps. Follow progress with `docker compose logs -f setup`.
+On first start the database restores itself (a couple of minutes). A one-shot `setup` service then pulls `qwen3:4b` and `bge-m3` into your Ollama if they are missing (a one-time download of about 4 GB). If Ollama is not running, the portal still works and the assistant shows as offline. Later runs start in seconds. Follow first-run progress with `docker compose logs -f db setup`.
+
+Build from source instead of pulling: `docker compose build && docker compose up -d`. With an empty database and no dump, `setup` runs the full ingest from OpenAlex (about 40 minutes), which needs the provided `illinois-researchers.csv` in `data/`.
 
 No Ollama on the host? Run a bundled one (CPU only inside Docker on macOS, so slow): `OLLAMA_URL=http://ollama:11434 docker compose --profile ollama up -d`.
 
@@ -98,7 +103,7 @@ End-to-end coverage includes: every section renders real data with no console er
 
 ## Database dump
 
-`db/dump/portal.sql.gz` (≈150 MB, over GitHub's 100 MB file limit) is distributed separately, not in the repository. [YOUR RELEASE LINK]
+The database (≈150 MB compressed, over GitHub's 100 MB file limit) is not in the repository: it ships inside the `uiuc-research-portal-db` image. Maintainers refresh it with `make image-dump && make publish`.
 
 ## Known limitations
 

@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Build context: repository root (the API imports the ingest package and data/ files).
 FROM python:3.11-slim
+LABEL org.opencontainers.image.source="https://github.com/qh-fol-in-luv-w-data/uiuc-research-portal"
 COPY --from=ghcr.io/astral-sh/uv:0.9.30 /uv /usr/local/bin/uv
 # psql restores the prebuilt database dump in the one-shot `setup` service
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
