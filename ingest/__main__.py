@@ -12,13 +12,15 @@ from .db import apply_migrations, connect
 from .embed import embed_faculty, embed_works
 from .embedder import EmbedderUnavailable, OllamaEmbedder
 from .faculty import load_faculty
+from .geo import partner_map
 from .linking import embed_profiles, link_faculty
 from .load_works import load_works
 from .units import resolve_uiuc_units
 from .openalex import (OpenAlexClient, QuotaExhausted, SliceTooLarge, month_slices, page_dir_for,
                        read_cached_results, resolve_filter)
 
-STEPS = ["fetch-works", "clean-works", "load-faculty", "embed-profiles", "link-faculty", "embed", "aggregate"]
+STEPS = ["fetch-works", "clean-works", "load-faculty", "embed-profiles", "link-faculty", "embed", "aggregate",
+         "partners-geo"]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -57,6 +59,8 @@ def run_step(step: str, s, conn, http: httpx.Client, force: bool, refresh: bool)
         print("faculty embedded:", embed_faculty(conn, embedder, force=force))
     elif step == "aggregate":
         print(aggregate(conn, s.docs_dir)["overview"])
+    elif step == "partners-geo":
+        print(f"partners with coordinates: {len(partner_map(conn, http, s.cache_dir))}")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -6,7 +6,8 @@ from typing import Generic, Literal, TypeVar
 from pydantic import BaseModel
 
 T = TypeVar("T")
-StatsKey = Literal["monthly", "types", "fields", "rising_topics", "top_venues", "top_partners", "top_faculty"]
+StatsKey = Literal["monthly", "types", "fields", "rising_topics", "top_venues", "top_partners", "top_faculty",
+                   "partner_map"]
 
 
 class ErrorBody(BaseModel):
