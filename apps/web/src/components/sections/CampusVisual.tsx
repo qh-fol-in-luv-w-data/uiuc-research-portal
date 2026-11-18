@@ -8,9 +8,10 @@ export function CampusVisual({ institution }: { institution: Institution | null 
   if (img) {
     return (
       <figure className="overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/30">
-        <Image src={img.url} alt={img.alt} width={1200} height={750} className="aspect-[16/10] h-auto w-full object-cover" priority />
+        <Image src={img.url} alt={img.alt} width={1920} height={1440} sizes="(min-width: 1024px) 40vw, 100vw" className="aspect-[16/10] h-auto w-full object-cover" priority />
         <figcaption className="bg-black/40 px-3 py-1.5 text-[11px] text-hero-muted">
-          Photo: {img.author}, {img.license}, via Wikimedia Commons
+          Photo: {img.author} ({img.license}),{" "}
+          <a href={img.source} className="underline decoration-dotted hover:text-hero-ink">Wikimedia Commons</a>
         </figcaption>
       </figure>
     );

@@ -10,5 +10,20 @@
   "longitude": -88.20727,
   "homepage": "https://illinois.edu",
   "description": "Public land-grant research university and the flagship campus of the University of Illinois System.",
-  "images": []
+  "images": [
+    {
+      "url": "/campus/foellinger.jpg",
+      "alt": "Foellinger Auditorium on the south end of the Main Quad, a red-brick building with a white columned portico",
+      "author": "Daderot",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Foellinger_Auditorium_-_UIUC_-_DSC09127.JPG"
+    },
+    {
+      "url": "/campus/altgeld.jpg",
+      "alt": "Altgeld Hall, home of the Department of Mathematics, a stone building with a tall bell tower and red tile roof",
+      "author": "Daderot",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Altgeld_Hall_-_UIUC_-_DSC09097.JPG"
+    }
+  ]
 }
