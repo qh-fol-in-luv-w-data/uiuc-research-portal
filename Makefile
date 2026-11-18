@@ -4,7 +4,7 @@
 WEB_PORT ?= 3000
 export WEB_PORT
 
-up:            ## build and start db, api and web (Ollama must run on the host)
+up:            ## build and start everything; first run restores data and pulls Ollama models
 	docker compose up -d --build --wait
 
 down:
