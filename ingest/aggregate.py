@@ -16,23 +16,26 @@ def _rows(conn, sql: str, params=()) -> list[tuple]:
         return cur.fetchall()
 
 
-def compute_stats(conn: psycopg.Connection, rising_min: int = 10) -> dict[str, object]:
+def compute_stats(conn: psycopg.Connection, rising_min: int = 40) -> dict[str, object]:
     works, citations, oa_share = _rows(conn, "SELECT count(*), coalesce(sum(cited_by_count), 0),"
-                                             " coalesce(avg(is_oa::int), 0) FROM works WHERE NOT is_outlier")[0]
+                                             " coalesce(avg(is_oa::int), 0) FROM works WHERE NOT is_outlier AND duplicate_of IS NULL")[0]
     outliers = _rows(conn, "SELECT count(*) FROM works WHERE is_outlier")[0][0]
+    duplicates = _rows(conn, "SELECT count(*) FROM works WHERE duplicate_of IS NOT NULL")[0][0]
     faculty = _rows(conn, "SELECT count(*) FROM faculty")[0][0]
     linked = _rows(conn, "SELECT count(DISTINCT faculty_id) FROM faculty_author_link")[0][0]
     partners = _rows(conn, "SELECT count(DISTINCT wi.institution_id) FROM work_institutions wi"
                            " JOIN works w ON w.id = wi.work_id"
-                           " WHERE NOT w.is_outlier AND NOT (wi.institution_id = ANY(%s))", (EXCLUDED,))[0][0]
+                           " JOIN institutions i ON i.id = wi.institution_id"
+                           " WHERE NOT w.is_outlier AND w.duplicate_of IS NULL AND NOT i.is_uiuc_unit"
+                           " AND NOT (wi.institution_id = ANY(%s))", (EXCLUDED,))[0][0]
     monthly = _rows(conn, "SELECT to_char(date_trunc('month', publication_date), 'YYYY-MM'), count(*)"
-                          " FROM works WHERE NOT is_outlier AND publication_date IS NOT NULL"
+                          " FROM works WHERE NOT is_outlier AND duplicate_of IS NULL AND publication_date IS NOT NULL"
                           " GROUP BY 1 ORDER BY 1")
     types = _rows(conn, "SELECT CASE WHEN venue_type = 'conference' AND type NOT IN"
                         " ('article','preprint','review','book-chapter') THEN 'conference-paper' ELSE type END,"
-                        " count(*) FROM works WHERE NOT is_outlier GROUP BY 1 ORDER BY 2 DESC, 1")
+                        " count(*) FROM works WHERE NOT is_outlier AND duplicate_of IS NULL GROUP BY 1 ORDER BY 2 DESC, 1")
     field_rows = _rows(conn, "SELECT coalesce(t.field, 'Unknown'), coalesce(t.subfield, 'Unknown'), count(*)"
-                             " FROM works w JOIN topics t ON t.id = w.primary_topic_id WHERE NOT w.is_outlier"
+                             " FROM works w JOIN topics t ON t.id = w.primary_topic_id WHERE NOT w.is_outlier AND w.duplicate_of IS NULL"
                              " GROUP BY 1, 2 ORDER BY 1, 3 DESC, 2")
     fields: dict[str, dict] = {}
     for f, sub, n in field_rows:
@@ -40,31 +43,31 @@ def compute_stats(conn: psycopg.Connection, rising_min: int = 10) -> dict[str, o
         entry["count"] += n
         entry["subfields"].append({"name": sub, "count": n})
     rising = _rows(conn, """
-        WITH b AS (SELECT LEAST(max(publication_date), current_date) AS maxd FROM works WHERE NOT is_outlier),
+        WITH b AS (SELECT LEAST(max(publication_date), current_date) AS maxd FROM works WHERE NOT is_outlier AND duplicate_of IS NULL),
         c AS (
           SELECT t.id, t.display_name, t.field,
             count(*) FILTER (WHERE w.publication_date > b.maxd - interval '12 months') AS recent,
             count(*) FILTER (WHERE w.publication_date <= b.maxd - interval '12 months'
                              AND w.publication_date > b.maxd - interval '24 months') AS prior
           FROM works w JOIN topics t ON t.id = w.primary_topic_id CROSS JOIN b
-          WHERE NOT w.is_outlier GROUP BY t.id, t.display_name, t.field)
+          WHERE NOT w.is_outlier AND w.duplicate_of IS NULL GROUP BY t.id, t.display_name, t.field)
         SELECT id, display_name, field, recent, prior, round((recent + 1)::numeric / (prior + 1), 2)
         FROM c WHERE recent >= %s ORDER BY 6 DESC, recent DESC, id LIMIT 15""", (rising_min,))
-    venues = _rows(conn, "SELECT venue_name, count(*) FROM works WHERE NOT is_outlier AND venue_name IS NOT NULL"
+    venues = _rows(conn, "SELECT venue_name, count(*) FROM works WHERE NOT is_outlier AND duplicate_of IS NULL AND venue_name IS NOT NULL"
                          " GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15")
     top_partners = _rows(conn, "SELECT i.id, i.display_name, i.country_code, count(DISTINCT wi.work_id)"
                                " FROM work_institutions wi JOIN institutions i ON i.id = wi.institution_id"
                                " JOIN works w ON w.id = wi.work_id"
-                               " WHERE NOT w.is_outlier AND NOT (i.id = ANY(%s))"
+                               " WHERE NOT w.is_outlier AND w.duplicate_of IS NULL AND NOT i.is_uiuc_unit AND NOT (i.id = ANY(%s))"
                                " GROUP BY 1, 2, 3 ORDER BY 4 DESC, 2 LIMIT 20", (EXCLUDED,))
     top_fac = _rows(conn, "SELECT f.id, f.name, count(DISTINCT s.work_id) FROM faculty f"
                           " JOIN faculty_author_link l ON l.faculty_id = f.id"
                           " JOIN authorships s ON s.author_id = l.author_id JOIN works w ON w.id = s.work_id"
-                          " WHERE NOT w.is_outlier GROUP BY 1, 2 ORDER BY 3 DESC, 2 LIMIT 15")
+                          " WHERE NOT w.is_outlier AND w.duplicate_of IS NULL GROUP BY 1, 2 ORDER BY 3 DESC, 2 LIMIT 15")
     return {
         "overview": {"works": works, "citations": int(citations), "oa_share": round(float(oa_share), 4),
                      "faculty": faculty, "faculty_linked": linked, "partner_institutions": partners,
-                     "outliers": outliers},
+                     "outliers": outliers, "duplicates": duplicates},
         "monthly": [{"month": m, "count": n} for m, n in monthly],
         "types": [{"type": t, "count": n} for t, n in types],
         "fields": sorted(fields.values(), key=lambda e: (-e["count"], e["field"])),
@@ -83,7 +86,7 @@ def _update_derived(conn: psycopg.Connection) -> None:
               SELECT DISTINCT ON (l.faculty_id) l.faculty_id, t.field
               FROM faculty_author_link l JOIN authorships s ON s.author_id = l.author_id
               JOIN works w ON w.id = s.work_id JOIN topics t ON t.id = w.primary_topic_id
-              WHERE NOT w.is_outlier AND t.field IS NOT NULL
+              WHERE NOT w.is_outlier AND w.duplicate_of IS NULL AND t.field IS NOT NULL
               GROUP BY l.faculty_id, t.field ORDER BY l.faculty_id, count(*) DESC, t.field) x
             WHERE f.id = x.faculty_id""")
         cur.execute("UPDATE authors a SET works_count_in_set = x.n FROM ("

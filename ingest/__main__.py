@@ -14,6 +14,7 @@ from .embedder import EmbedderUnavailable, OllamaEmbedder
 from .faculty import load_faculty
 from .linking import embed_profiles, link_faculty
 from .load_works import load_works
+from .units import resolve_uiuc_units
 from .openalex import (OpenAlexClient, QuotaExhausted, SliceTooLarge, month_slices, page_dir_for,
                        read_cached_results, resolve_filter)
 
@@ -42,7 +43,8 @@ def run_step(step: str, s, conn, http: httpx.Client, force: bool, refresh: bool)
             print(f"fetch-works: {total} works (through {sl.rsplit('from_publication_date:', 1)[1]})", flush=True)
     elif step == "clean-works":
         raw = (w for sl in month_slices(filter_str) for w in read_cached_results(page_dir_for(s.cache_dir, sl)))
-        print(load_works(conn, raw))
+        units = resolve_uiuc_units(s.cache_dir, http, s.data_dir / "uiuc_units.yaml")
+        print(load_works(conn, raw, uiuc_units=units))
     elif step == "load-faculty":
         print(load_faculty(conn, s.data_dir / "illinois-researchers.csv", s.data_dir))
     elif step == "embed-profiles":

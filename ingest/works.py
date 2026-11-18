@@ -54,6 +54,8 @@ class ParsedWork:
     unattributed_uiuc: bool = False
     raw_authorship_count: int = 0
     unattributed_raw: list[str] = field(default_factory=list)
+    publication_year: int = 0
+    citations_by_year: dict[int, int] = field(default_factory=dict)
 
 
 def _topic_row(t: dict) -> dict:
@@ -66,7 +68,7 @@ def _topic_row(t: dict) -> dict:
     }
 
 
-def parse_work(w: dict) -> ParsedWork:
+def parse_work(w: dict, uiuc_units: frozenset[str] = frozenset({UIUC_ID})) -> ParsedWork:
     wid = short_id(w["id"])
     src = _source(w)
     oa = w.get("open_access") or {}
@@ -87,7 +89,11 @@ def parse_work(w: dict) -> ParsedWork:
         "primary_topic_id": short_id(pt.get("id")),
         "is_outlier": False,
         "outlier_reason": None,
+        "duplicate_of": None,
     })
+    p.publication_year = int((w.get("publication_date") or "0")[:4] or 0)
+    p.citations_by_year = {int(c["year"]): int(c.get("cited_by_count") or 0)
+                           for c in w.get("counts_by_year") or [] if c.get("year")}
     insts: dict[str, dict] = {}
     seen: set[str] = set()
     p.raw_authorship_count = len(w.get("authorships") or [])
@@ -103,11 +109,11 @@ def parse_work(w: dict) -> ParsedWork:
             if not iid:
                 continue
             inst_ids.append(iid)
+            # a UIUC unit: UIUC itself, an OpenAlex child or curated institute, or UIUC in its lineage
+            unit = iid in uiuc_units or UIUC_ID in {short_id(x) for x in i.get("lineage") or []}
             insts[iid] = {"id": iid, "display_name": i.get("display_name"),
-                          "country_code": i.get("country_code"), "type": i.get("type")}
-            # child institutions (institutes, centers) list UIUC in their lineage
-            if iid == UIUC_ID or UIUC_ID in {short_id(x) for x in i.get("lineage") or []}:
-                uiuc = True
+                          "country_code": i.get("country_code"), "type": i.get("type"), "is_uiuc_unit": unit}
+            uiuc = uiuc or unit
         raw = "; ".join(a.get("raw_affiliation_strings") or []) or None
         if not aid:
             # OpenAlex has not attributed this authorship to an author id yet: no author row,
@@ -136,7 +142,7 @@ def parse_work(w: dict) -> ParsedWork:
 
 
 def mark_outliers(items: list[ParsedWork]) -> dict[str, int]:
-    counts = {"no_uiuc_affiliation": 0, "non_english_high_citation": 0}
+    counts = {"no_uiuc_affiliation": 0, "non_english_high_citation": 0, "citations_predate_publication": 0}
     cites = sorted(p.work["cited_by_count"] for p in items)
     p99 = cites[int(0.99 * (len(cites) - 1))] if cites else 0
     for p in items:
@@ -149,6 +155,9 @@ def mark_outliers(items: list[ParsedWork]) -> dict[str, int]:
             reason = "no_uiuc_affiliation"
         elif p.work["language"] not in (None, "en") and p99 > 0 and p.work["cited_by_count"] >= p99:
             reason = "non_english_high_citation"
+        elif p.publication_year and any(n > 0 and y <= p.publication_year - 2 for y, n in p.citations_by_year.items()):
+            # cited two or more years before it was "published": a reissue of an older work
+            reason = "citations_predate_publication"
         if reason:
             p.work["is_outlier"] = True
             p.work["outlier_reason"] = reason

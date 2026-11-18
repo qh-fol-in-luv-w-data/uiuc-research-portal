@@ -15,7 +15,7 @@ BASE_URL = "https://api.openalex.org"
 WORK_FIELDS = [
     "id", "doi", "title", "publication_date", "type", "language", "cited_by_count", "open_access",
     "primary_location", "primary_topic", "topics", "authorships", "is_retracted", "is_paratext",
-    "abstract_inverted_index",
+    "abstract_inverted_index", "counts_by_year",
 ]
 
 
@@ -73,7 +73,9 @@ def resolve_filter(cache_dir: Path, today: date, refresh: bool = False) -> str:
 
 
 def page_dir_for(cache_dir: Path, filter_str: str) -> Path:
-    return cache_dir / "works" / hashlib.sha1(filter_str.encode()).hexdigest()[:12]
+    # the selected fields are part of the key: changing WORK_FIELDS must not reuse stale pages
+    key = f"{filter_str}|{','.join(WORK_FIELDS)}"
+    return cache_dir / "works" / hashlib.sha1(key.encode()).hexdigest()[:12]
 
 
 def _cached_pages(page_dir: Path) -> list[Path]:
