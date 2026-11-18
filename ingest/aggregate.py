@@ -103,6 +103,8 @@ def render_data_quality(dq_works: dict | None, dq_faculty: dict | None, dq_link:
              f"- Kept after cleaning: {w.get('kept', 'n/a')} (capped: {w.get('capped', 0)})",
              "- Dropped by reason:"]
     lines += [f"  - `{k}`: {v}" for k, v in sorted((w.get("dropped") or {}).items())] or ["  - none"]
+    lines += [f"- Duplicate versions collapsed (same title + shared author, preprint vs published):"
+              f" {w.get('duplicate_versions', 'n/a')}"]
     lines += ["- Flagged as outliers (kept, excluded from notable stats):"]
     lines += [f"  - `{k}`: {v}" for k, v in sorted((w.get("outliers") or {}).items())]
     lines += ["", "## Faculty", "",
