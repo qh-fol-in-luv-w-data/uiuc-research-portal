@@ -42,11 +42,14 @@ screenshots:
 REGISTRY ?= ghcr.io/qh-fol-in-luv-w-data
 TAG ?= latest
 PLATFORMS ?= linux/amd64,linux/arm64
+SOURCE := https://github.com/qh-fol-in-luv-w-data/uiuc-research-portal
+# index-level annotation: lets GitHub link the multi-arch packages to the repository
+ANNOTATE := --annotation "index:org.opencontainers.image.source=$(SOURCE)"
 
 image-dump:    ## dump without DROP statements, baked into the db image
 	docker compose exec -T db pg_dump -U portal --no-owner --no-privileges portal | gzip -9 > db/dump/portal-image.sql.gz
 
 publish:       ## build and push db, api and web images for amd64 + arm64
-	docker buildx build --platform $(PLATFORMS) -t $(REGISTRY)/uiuc-research-portal-db:$(TAG) --push db
-	docker buildx build --platform $(PLATFORMS) -t $(REGISTRY)/uiuc-research-portal-api:$(TAG) -f apps/api/Dockerfile --push .
-	docker buildx build --platform $(PLATFORMS) -t $(REGISTRY)/uiuc-research-portal-web:$(TAG) --push apps/web
+	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-db:$(TAG) --push db
+	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-api:$(TAG) -f apps/api/Dockerfile --push .
+	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-web:$(TAG) --push apps/web
