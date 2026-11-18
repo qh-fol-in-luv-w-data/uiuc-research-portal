@@ -30,8 +30,9 @@ async function HeroData() {
 async function FocusData() {
   await connection();
   try {
-    const [fields, rising, topFaculty] = await Promise.all([getStats("fields"), getStats("rising_topics"), getStats("top_faculty")]);
-    return <FocusAreas fields={fields} rising={rising} topFaculty={topFaculty} />;
+    const [fields, rising, topFaculty, byField] = await Promise.all([
+      getStats("fields"), getStats("rising_topics"), getStats("top_faculty"), getStats("by_field")]);
+    return <FocusAreas fields={fields} rising={rising} topFaculty={topFaculty} byField={byField} />;
   } catch {
     return <SectionError what="Research focus areas" />;
   }

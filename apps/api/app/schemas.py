@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 T = TypeVar("T")
 StatsKey = Literal["monthly", "types", "fields", "rising_topics", "top_venues", "top_partners", "top_faculty",
-                   "partner_map"]
+                   "partner_map", "by_field"]
 
 
 class ErrorBody(BaseModel):
@@ -50,7 +50,7 @@ class Overview(BaseModel):
 class StatsPayload(BaseModel):
     key: StatsKey
     computed_at: datetime
-    data: list[dict]
+    data: list[dict] | dict
 
 
 class AuthorRef(BaseModel):
