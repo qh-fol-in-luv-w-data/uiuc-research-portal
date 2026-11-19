@@ -123,7 +123,7 @@ The design was mocked up first, then built in Next.js. Motion follows a "data po
 ## Tests
 
 ```bash
-make test   # 109 Python tests (ingest + API) and 10 web unit tests
+make test   # 119 Python tests (ingest + API) and 12 web unit tests
 make e2e    # 10 Playwright end-to-end tests against the running stack (uses the local Chrome)
 make eval   # 84 real questions (64 English, 20 Vietnamese) through the full stack; writes eval/report.md
 make attacks  # SQL-injection and prompt-injection attacks against the assistant; see docs/security.md
