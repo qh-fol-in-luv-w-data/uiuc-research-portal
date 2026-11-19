@@ -16,7 +16,7 @@ SYSTEM = (
     "and cite each one as [n] with its number. List papers newest first when the question asks for recent work, "
     "most cited first when it asks for top or most cited work, otherwise most relevant first. "
     "Ignore off-topic sources. If no source is squarely on the topic, say so plainly and name the closest ones and how "
-    "they relate. Never invent papers, people or facts. Answer in the language of the question, in 3 to 6 sentences."
+    "they relate. Never invent papers, people or facts. Answer in the language of the question, in 3 to 5 sentences."
 )
 OUT_OF_SCOPE = ("I can only help with research at the University of Illinois Urbana-Champaign (UIUC): recent publications, "
                 "notable papers and faculty expertise. Try asking about a research topic.")
@@ -32,7 +32,7 @@ def no_results(plan: dict) -> str:
             "Try a broader or differently worded question.")
 
 
-def build_sources(papers: list[dict], faculty: list[dict]) -> tuple[list[dict], str]:
+def build_sources(papers: list[dict], faculty: list[dict], abstract_chars: int = 200) -> tuple[list[dict], str]:
     """Returns (sources for the UI, numbered source text for the prompt). Papers first, then faculty."""
     ui, lines = [], []
     for p in papers:
@@ -43,7 +43,7 @@ def build_sources(papers: list[dict], faculty: list[dict]) -> tuple[list[dict], 
         url = p["doi"] or f"https://openalex.org/{p['id']}"
         ui.append({"n": n, "kind": "work", "id": p["id"], "title": p["title"], "meta": meta, "url": url})
         authors = ", ".join(p.get("uiuc_authors", [])[:4]) or "not listed"
-        abstract = re.sub(r"\s+", " ", (p.get("abstract") or "")).strip()[:300]
+        abstract = re.sub(r"\s+", " ", (p.get("abstract") or "")).strip()[:abstract_chars]
         lines.append(f"[{n}] {p['title']} ({kind}, {month(p['publication_date'])}{', ' + venue if venue else ''}; "
                      f"{p['cited_by_count']} citations). UIUC authors: {authors}. {abstract}")
     for f in faculty:

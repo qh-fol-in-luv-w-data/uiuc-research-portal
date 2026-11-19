@@ -12,6 +12,8 @@ async def understand(question: str, history: list[dict] | None, today: str, olla
     raw, source = None, "model"
     try:
         try:
+            if cfg.qu_model == cfg.chat_model:
+                raise ModelMissing(cfg.qu_model)  # single-model mode: few-shot on the chat model (no model swapping)
             raw = await asyncio.wait_for(
                 ollama.chat_json(cfg.qu_model, qu.build_messages(question, today, history), qu.SCHEMA), cfg.qu_timeout)
         except ModelMissing:
@@ -25,4 +27,7 @@ async def understand(question: str, history: list[dict] | None, today: str, olla
     plan = qu.parse(raw) if raw else None
     if qu.needs_fallback(plan):
         return rules.parse(question, today), "rules"
+    if source == "fewshot":
+        # few-shot models over-predict "recent" (sort 61-73% on held-out sets); explicit wording is reliable (89%+)
+        plan["sort"] = rules.parse(question, today)["sort"]
     return plan, source

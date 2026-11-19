@@ -40,7 +40,8 @@ def parse(question: str, today: str) -> dict:
     wants_faculty, wants_papers = bool(FACULTY.search(q)), bool(PAPERS.search(q))
     intent = "both" if wants_faculty and wants_papers and "work on" not in q else "faculty" if wants_faculty else "papers"
     sort = ("recent" if re.search(r"\b(recent|latest|newest|new)\b", q)
-            else "cited" if re.search(r"\b(most cited|highly cited|influential|top)\b", q) else "relevance")
+            else "cited" if re.search(r"\b(most cited|highly cited|influential|top|best known|well known|landmark|seminal|"
+                                       r"most important|key papers)\b", q) else "relevance")
     limit_m = re.search(r"\b(?:top|first)\s+(\d{1,2})\b|\b(\d{1,2})\s+(?:papers|publications|faculty|people)\b", q)
     limit = min(20, max(1, int(next(g for g in limit_m.groups() if g)))) if limit_m else 5
     date_from = date_to = None

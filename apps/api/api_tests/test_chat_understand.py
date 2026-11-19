@@ -73,3 +73,23 @@ def test_rules_dates_sort_limit():
     assert p["sort"] == "cited" and p["limit"] == 10 and p["date_from"] == "2025-01-01" and p["date_to"] is None
     p = rules_parse("papers about coral reefs in 2025", TODAY)
     assert p["date_from"] == "2025-01-01" and p["date_to"] == "2025-12-31" and p["concepts"][0][0] == "coral reefs"
+
+
+def test_single_model_mode_uses_fewshot_and_rule_sort():
+    # QU model == chat model: one LLM in memory, few-shot prompt, sort decided by rules (model over-predicts "recent")
+    over_recent = qu.dump({"intent": "papers", "standalone_question": "CRISPR in plants",
+                           "concepts": [["crispr", "gene editing"], ["plants", "crops"]],
+                           "date_from": None, "date_to": None, "sort": "recent", "limit": 5})
+    cfg = ChatConfig(qu_model="instruct", chat_model="instruct", qu_timeout=1)
+    o = FakeOllama({"instruct": over_recent})
+    plan, source = run(understand("CRISPR in plants", None, TODAY, o, cfg))
+    assert source == "fewshot" and o.calls[0][1] > 2   # few-shot messages
+    assert plan["sort"] == "relevance"
+    plan, _ = run(understand("most recent CRISPR papers", None, TODAY, FakeOllama({"instruct": over_recent}), cfg))
+    assert plan["sort"] == "recent"
+
+
+def test_rules_sort_lexicon():
+    assert rules_parse("best known UIUC work in topological insulators", TODAY)["sort"] == "cited"
+    assert rules_parse("most influential papers on graphene", TODAY)["sort"] == "cited"
+    assert rules_parse("UIUC economics research", TODAY)["sort"] == "relevance"

@@ -15,6 +15,12 @@ class ChatConfig:
     qu_model: str = field(default_factory=lambda: _env("OLLAMA_QU_MODEL", "hodacquan2004/uiuc-qu:4b"))
     chat_model: str = field(default_factory=lambda: _env("OLLAMA_CHAT_MODEL", "qwen3:4b-instruct-2507-q4_K_M"))
     embed_model: str = field(default_factory=lambda: _env("OLLAMA_EMBED_MODEL", "bge-m3"))
+    # memory: small contexts + a long keep-alive let Ollama keep all three models loaded instead of swapping
+    # them per request (swapping cost 5-10 s per answer on an 18 GB laptop)
+    qu_num_ctx: int = 2048
+    chat_num_ctx: int = 4096
+    embed_num_ctx: int = 1024
+    keep_alive: str = field(default_factory=lambda: _env("OLLAMA_KEEP_ALIVE", "30m"))
     qu_timeout: float = 20.0
     gen_timeout: float = 90.0
     # retrieval
@@ -24,5 +30,6 @@ class ChatConfig:
     w_keywords: float = 0.4
     w_vector: float = 0.4
     w_papers: float = 0.2
-    max_papers: int = 10       # paper sources given to the answer step (it cites only the relevant ones)
+    max_papers: int = 8        # paper sources given to the answer step (it cites only the relevant ones)
+    abstract_chars: int = 200  # per source in the answer prompt: shorter prompt = faster first token
     max_faculty: int = 6
