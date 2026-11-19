@@ -85,7 +85,7 @@ Problems found and fixed during ingest (details in [`docs/data-quality.md`](docs
 
 | Step | How | Model |
 |---|---|---|
-| 1. Understand | Question (+ last turns) → JSON plan: intent, concept groups, date window, sort, limit. JSON schema enforced, `think: false`. Falls back to the chat model with few-shot examples if the finetuned model is missing, and to a rule parser on timeout or an unusable plan | [`hodacquan2004/uiuc-qu:4b`](https://ollama.com/hodacquan2004/uiuc-qu) (Qwen3-4B + LoRA, finetuned for this step, Q8_0) |
+| 1. Understand | Question (+ last turns) → JSON plan: intent, concept groups, date window, sort, limit. JSON schema enforced, `think: false`. Falls back to the chat model with few-shot examples if the finetuned model is missing, and to a rule parser on timeout or an unusable plan | [`hodacquan2004/uiuc-qu:4b`](https://ollama.com/hodacquan2004/uiuc-qu) (Qwen3-4B + LoRA, finetuned for this step, Q4_K_M; `:4b-q8` also published) |
 | 2. Retrieve | No LLM. **Papers:** candidates from full-text (works matching every concept group) ∪ nearest works to the question ∪ nearest works to the concepts, fused with reciprocal rank fusion, date window, outliers and duplicate versions removed. **Faculty:** keyword evidence per concept group (core term vs synonym, IDF-weighted, head-noun aware) + profile similarity + related papers, ranked so experts covering every part of the question come first | `bge-m3` embeddings, pgvector |
 | 3. Answer | Numbered sources → a short answer that cites only sources actually on topic and says plainly when few match; citations pointing to no source are removed | `qwen3:4b-instruct-2507` |
 
@@ -93,8 +93,11 @@ Problems found and fixed during ingest (details in [`docs/data-quality.md`](docs
 
 | Model | Valid JSON | Intent | Sort | Dates | Concept recall | p50 latency |
 |---|---|---|---|---|---|---|
-| `uiuc-qu:4b` (finetuned) | 100% | 92–94% | **100%** | 92–97% | 97–100% | 6 s |
+| `uiuc-qu:4b` finetuned, Q4_K_M (default) | 100% | 94–100% | **97–100%** | 92–97% | 98–100% | 4 s |
+| `uiuc-qu:4b-q8` finetuned, Q8_0 | 100% | 92–94% | 100% | 92–97% | 97–100% | 6 s |
 | `qwen3:4b` + few-shot | 100% | 94–96% | 58–65% | 85–97% | 98% | 4–5 s |
+
+**Latency.** Three things took a typical answer from 21–23 s to 6–8 s: requantizing the finetuned model from Q8_0 to Q4_K_M (same benchmark scores, 2.5 GB instead of 4.3 GB), small per-model context sizes plus a long keep-alive so Ollama keeps all three models loaded instead of swapping them per request, and a shorter answer prompt (8 sources, 200-character abstracts). A single-model setup (the chat model also planning the search, few-shot) was 2–3 s faster still but planned noticeably worse searches for the required questions, so it is not the default.
 
 The finetuned model is what makes "most recent" / "most cited" questions reliable. Two lessons from building it: the Ollama chat template must match the training prompt (an always-open `<think>` block made the model ramble), and an LLM judge of 4B parameters could not reliably score search results, so the answer step selects relevant sources instead.
 
@@ -129,7 +132,7 @@ The database (≈150 MB compressed, over GitHub's 100 MB file limit) is not in t
 ## Known limitations
 
 - If the finetuned model cannot be pulled, the assistant uses the chat model with few-shot examples (weaker on sort, see the benchmark).
-- Answers take about 10–20 s on a laptop GPU (three model calls). Faculty ranking for broad two-part questions is good but not perfect; the portal's faculty search box is still keyword-only.
+- Answers finish in about 6–8 s on an M3 Pro (first words after 3–5 s) when all three models fit in GPU memory (about 7 GB). With less free memory Ollama swaps models between steps and answers take 15–20 s; close other heavy apps or give Ollama more memory. Faculty ranking for broad two-part questions is good but not perfect; the portal's faculty search box is still keyword-only.
 - OpenAlex data changes daily; counts in this README are from the 17–18 Nov 2026 ingest.
 
 Not an official University of Illinois site. Data: OpenAlex (CC0); faculty directory provided with the assessment; map © OpenStreetMap contributors.

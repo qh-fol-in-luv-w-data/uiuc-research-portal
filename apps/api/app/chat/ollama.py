@@ -16,9 +16,12 @@ class ModelMissing(OllamaError):
 
 
 class Ollama:
-    def __init__(self, base_url: str, http: httpx.AsyncClient | None = None):
+    def __init__(self, base_url: str, http: httpx.AsyncClient | None = None, keep_alive: str = "30m",
+                 num_ctx: dict[str, int] | None = None):
         self.base = base_url.rstrip("/")
         self.http = http or httpx.AsyncClient(timeout=None)
+        self.keep_alive = keep_alive
+        self.num_ctx = num_ctx or {}  # model -> context length (a changed num_ctx forces Ollama to reload a model)
 
     async def _post(self, path: str, body: dict, timeout: float | None) -> httpx.Response:
         try:
@@ -33,12 +36,14 @@ class Ollama:
 
     async def chat_json(self, model: str, messages: list[dict], schema: dict, num_predict: int = 400) -> str:
         r = await self._post("/api/chat", {"model": model, "messages": messages, "stream": False, "think": False,
-                                           "format": schema, "options": {"temperature": 0, "num_predict": num_predict}}, 90)
+                                           "format": schema, "keep_alive": self.keep_alive,
+                                           "options": {"temperature": 0, "num_predict": num_predict,
+                                                       **self._ctx(model)}}, 90)
         return r.json()["message"]["content"] or ""
 
     async def chat_stream(self, model: str, messages: list[dict], timeout: float) -> AsyncIterator[str]:
-        body = {"model": model, "messages": messages, "stream": True,
-                "options": {"temperature": 0.2, "num_predict": 500}}
+        body = {"model": model, "messages": messages, "stream": True, "keep_alive": self.keep_alive,
+                "options": {"temperature": 0.2, "num_predict": 320, **self._ctx(model)}}
         try:
             async with self.http.stream("POST", f"{self.base}/api/chat", json=body, timeout=timeout) as r:
                 if r.status_code == 404:
@@ -60,8 +65,12 @@ class Ollama:
             raise OllamaError(f"Ollama not reachable at {self.base}") from exc
 
     async def embed(self, model: str, texts: list[str]) -> list[np.ndarray]:
-        r = await self._post("/api/embed", {"model": model, "input": [t[:2000] for t in texts]}, 60)
+        r = await self._post("/api/embed", {"model": model, "input": [t[:2000] for t in texts],
+                                            "keep_alive": self.keep_alive, "options": self._ctx(model)}, 60)
         return [np.asarray(v, dtype=np.float32) for v in r.json()["embeddings"]]
+
+    def _ctx(self, model: str) -> dict:
+        return {"num_ctx": self.num_ctx[model]} if model in self.num_ctx else {}
 
     async def tags(self) -> list[str]:
         try:

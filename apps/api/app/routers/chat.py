@@ -77,7 +77,7 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
             qv, cv = await ollama.embed(cfg.embed_model, [plan["standalone_question"],
                                                           " — ".join(", ".join(g[:3]) for g in groups) or body.question])
             papers, faculty = await run_in_threadpool(_retrieve, request, plan, qv, cv)
-            sources, context = build_sources(papers, faculty)
+            sources, context = build_sources(papers, faculty, cfg.abstract_chars)
             yield sse("sources", {"sources": sources})
             if not sources:
                 text = no_results(plan)

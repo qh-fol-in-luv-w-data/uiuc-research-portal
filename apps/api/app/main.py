@@ -36,7 +36,11 @@ def create_app(database_url: str | None = None, institution_path: Path | None = 
     app.state.institution_path = institution_path or ROOT / "data" / "institution.json"
     app.state.ollama = ollama or OllamaTags(os.environ.get("OLLAMA_URL", "http://localhost:11434"))
     app.state.chat_cfg = ChatConfig()
-    app.state.chat_ollama = chat_ollama or Ollama(app.state.chat_cfg.ollama_url)
+    cfg = app.state.chat_cfg
+    app.state.chat_ollama = chat_ollama or Ollama(
+        cfg.ollama_url, keep_alive=cfg.keep_alive,
+        # chat model last: if the QU and chat model are the same, they share one context size (no reloads)
+        num_ctx={cfg.qu_model: cfg.qu_num_ctx, cfg.embed_model: cfg.embed_num_ctx, cfg.chat_model: cfg.chat_num_ctx})
     app.state.faculty_index = None
     app.state.required_models = [app.state.chat_cfg.chat_model, app.state.chat_cfg.embed_model]
 
