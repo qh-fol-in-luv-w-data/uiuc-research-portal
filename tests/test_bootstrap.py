@@ -49,3 +49,16 @@ def test_db_is_empty_leaves_no_open_transaction(db):
     from psycopg.pq import TransactionStatus
     db_is_empty(db)
     assert db.info.transaction_status == TransactionStatus.IDLE
+
+
+def test_optional_model_pull_failure_is_not_fatal():
+    def handler(request):
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "bge-m3:latest"}]})
+        if json.loads(request.content)["model"] == "someone/custom:4b":
+            return httpx.Response(500, json={"error": "pull failed"})
+        return httpx.Response(200, json={"status": "success"})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    report = ensure_models(http, "http://o", ["bge-m3"], optional=["someone/custom:4b"], log=lambda m: None)
+    assert report == {"pulled": [], "present": ["bge-m3"], "optional_failed": ["someone/custom:4b"]}

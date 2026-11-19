@@ -12,7 +12,7 @@ def _env(name: str, default: str) -> str:
 class ChatConfig:
     """Every assistant parameter in one place (models from env; retrieval values tuned in eval/)."""
     ollama_url: str = field(default_factory=lambda: _env("OLLAMA_URL", "http://localhost:11434"))
-    qu_model: str = field(default_factory=lambda: _env("OLLAMA_QU_MODEL", "uiuc-qu:4b"))
+    qu_model: str = field(default_factory=lambda: _env("OLLAMA_QU_MODEL", "hodacquan2004/uiuc-qu:4b"))
     chat_model: str = field(default_factory=lambda: _env("OLLAMA_CHAT_MODEL", "qwen3:4b-instruct-2507-q4_K_M"))
     embed_model: str = field(default_factory=lambda: _env("OLLAMA_EMBED_MODEL", "bge-m3"))
     qu_timeout: float = 20.0
