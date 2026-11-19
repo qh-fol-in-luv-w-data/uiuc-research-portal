@@ -11,13 +11,16 @@ from pgvector.psycopg import register_vector
 from psycopg_pool import ConnectionPool
 
 from .ollama import OllamaTags
-from .routers import faculty, health, stats, works
+from .chat.config import ChatConfig
+from .chat.ollama import Ollama
+from .routers import chat, faculty, health, stats, works
 
 ROOT = Path(__file__).resolve().parents[3]
 ERROR_CODES = {400: "bad_request", 404: "not_found", 422: "invalid_request", 503: "unavailable"}
 
 
-def create_app(database_url: str | None = None, institution_path: Path | None = None, ollama=None) -> FastAPI:
+def create_app(database_url: str | None = None, institution_path: Path | None = None, ollama=None,
+               chat_ollama=None) -> FastAPI:
     database_url = database_url or os.environ.get("DATABASE_URL", "postgresql://portal:portal@localhost:55432/portal")
 
     @asynccontextmanager
@@ -32,8 +35,10 @@ def create_app(database_url: str | None = None, institution_path: Path | None = 
     app = FastAPI(title="UIUC Research Portal API", version="0.1.0", lifespan=lifespan)
     app.state.institution_path = institution_path or ROOT / "data" / "institution.json"
     app.state.ollama = ollama or OllamaTags(os.environ.get("OLLAMA_URL", "http://localhost:11434"))
-    app.state.required_models = [os.environ.get("OLLAMA_CHAT_MODEL", "qwen3:4b"),
-                                 os.environ.get("OLLAMA_EMBED_MODEL", "bge-m3")]
+    app.state.chat_cfg = ChatConfig()
+    app.state.chat_ollama = chat_ollama or Ollama(app.state.chat_cfg.ollama_url)
+    app.state.faculty_index = None
+    app.state.required_models = [app.state.chat_cfg.chat_model, app.state.chat_cfg.embed_model]
 
     @app.exception_handler(HTTPException)
     async def http_error(_: Request, exc: HTTPException):
@@ -47,7 +52,7 @@ def create_app(database_url: str | None = None, institution_path: Path | None = 
         return JSONResponse(status_code=422, content={"error": "invalid_request",
                                                       "detail": f"{where}: {first.get('msg', 'invalid')}"})
 
-    for router in (health.router, stats.router, works.router, faculty.router):
+    for router in (health.router, stats.router, works.router, faculty.router, chat.router):
         app.include_router(router)
     return app
 

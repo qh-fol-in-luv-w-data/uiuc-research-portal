@@ -9,7 +9,8 @@ from .conftest import FakeOllama
 def test_health_ok(client):
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json() == {"db": True, "ollama": True, "models": ["qwen3:4b", "bge-m3:latest"], "missing_models": []}
+    assert r.json() == {"db": True, "ollama": True, "models": ["qwen3:4b-instruct-2507-q4_K_M", "bge-m3:latest"],
+                        "missing_models": []}
 
 
 def test_health_reports_ollama_down_without_failing(db, tmp_path):
@@ -17,7 +18,7 @@ def test_health_reports_ollama_down_without_failing(db, tmp_path):
     with TestClient(app) as c:
         body = c.get("/health").json()
     assert body["db"] is True and body["ollama"] is False
-    assert body["missing_models"] == ["qwen3:4b", "bge-m3"]
+    assert body["missing_models"] == ["qwen3:4b-instruct-2507-q4_K_M", "bge-m3"]
 
 
 def test_overview_merges_institution(client):

@@ -13,7 +13,7 @@ BIO = make_topic("T2", "Organic Synthesis", "Organic Chemistry", "Chemistry", "P
 
 
 class FakeOllama:
-    def __init__(self, up=True, models=("qwen3:4b", "bge-m3:latest")):
+    def __init__(self, up=True, models=("qwen3:4b-instruct-2507-q4_K_M", "bge-m3:latest")):
         self.up, self.models = up, list(models)
 
     def tags(self):
