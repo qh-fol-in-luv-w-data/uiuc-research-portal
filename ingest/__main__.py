@@ -84,7 +84,9 @@ def main(argv: list[str] | None = None) -> int:
                                 models=[os.environ.get("OLLAMA_CHAT_MODEL", "qwen3:4b-instruct-2507-q4_K_M"),
                                         s.embed_model],
                                 dump_path=s.data_dir.parent / "db" / "dump" / "portal.sql.gz",
-                                dump_url=os.environ.get("DUMP_URL", ""), run_full_ingest=full_ingest), flush=True)
+                                dump_url=os.environ.get("DUMP_URL", ""), run_full_ingest=full_ingest,
+                                optional_models=[os.environ.get("OLLAMA_QU_MODEL") or "hodacquan2004/uiuc-qu:4b"]),
+                      flush=True)
                 return 0
             for step in steps:
                 print(f"== {step}", flush=True)

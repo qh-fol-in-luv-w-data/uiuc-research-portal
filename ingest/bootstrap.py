@@ -64,27 +64,38 @@ def _installed(required: str, models: list[str]) -> bool:
     return any(m == required or m.split(":")[0] == required for m in models)
 
 
-def ensure_models(http: httpx.Client, ollama_url: str, models: list[str], log: Callable[[str], None] = print) -> dict:
+def ensure_models(http: httpx.Client, ollama_url: str, models: list[str], log: Callable[[str], None] = print,
+                  optional: list[str] | None = None) -> dict:
+    """Pull missing models. `optional` ones (the finetuned query model) may fail without stopping setup:
+    the assistant then falls back to the chat model with few-shot examples."""
     base = ollama_url.rstrip("/")
     try:
         have = [m["name"] for m in http.get(f"{base}/api/tags", timeout=5).json().get("models", [])]
     except httpx.TransportError:
         log(f"Ollama not reachable at {base}: the portal works, the assistant stays offline until it runs")
         return {"error": f"Ollama not reachable at {base}"}
-    pulled, present = [], []
-    for m in models:
+    pulled, present, failed = [], [], []
+    for m in [*models, *(optional or [])]:
         if _installed(m, have):
             present.append(m)
             continue
         log(f"pulling Ollama model {m} (one-time download, can take several minutes)")
-        http.post(f"{base}/api/pull", json={"model": m, "stream": False}, timeout=None).raise_for_status()
+        resp = http.post(f"{base}/api/pull", json={"model": m, "stream": False}, timeout=None)
+        if resp.status_code >= 400 and m in (optional or []):
+            log(f"optional model {m} could not be pulled; the assistant will use its few-shot fallback")
+            failed.append(m)
+            continue
+        resp.raise_for_status()
         pulled.append(m)
-    return {"pulled": pulled, "present": present}
+    report = {"pulled": pulled, "present": present}
+    if optional:
+        report["optional_failed"] = failed
+    return report
 
 
 def bootstrap(conn: psycopg.Connection, http: httpx.Client, *, database_url: str, ollama_url: str,
               models: list[str], dump_path: Path, dump_url: str, run_full_ingest: Callable[[], None],
-              log: Callable[[str], None] = print) -> dict:
+              log: Callable[[str], None] = print, optional_models: list[str] | None = None) -> dict:
     report: dict = {}
     if db_is_empty(conn):
         source = dump_source(dump_path, dump_url)
@@ -100,5 +111,5 @@ def bootstrap(conn: psycopg.Connection, http: httpx.Client, *, database_url: str
             report["data"] = "built by full ingest"
     else:
         report["data"] = "already present"
-    report["models"] = ensure_models(http, ollama_url, models, log)
+    report["models"] = ensure_models(http, ollama_url, models, log, optional=optional_models)
     return report

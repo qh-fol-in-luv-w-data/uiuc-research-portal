@@ -24,7 +24,7 @@ That's all. Docker pulls three prebuilt images from GitHub Container Registry (a
 | `uiuc-research-portal-api` | FastAPI service and the ingest CLI |
 | `uiuc-research-portal-web` | Next.js portal |
 
-On first start the database restores itself (a couple of minutes). A one-shot `setup` service then pulls `qwen3:4b` and `bge-m3` into your Ollama if they are missing (a one-time download of about 4 GB). If Ollama is not running, the portal still works and the assistant shows as offline. Later runs start in seconds. Follow first-run progress with `docker compose logs -f db setup`.
+On first start the database restores itself (a couple of minutes). A one-shot `setup` service then pulls the models into your Ollama if they are missing: `qwen3:4b-instruct-2507` (answers), `bge-m3` (embeddings) and the finetuned `hodacquan2004/uiuc-qu:4b` (query understanding), a one-time download of about 8 GB. If Ollama is not running, the portal still works and the assistant shows as offline. Later runs start in seconds. Follow first-run progress with `docker compose logs -f db setup`.
 
 Build from source instead of pulling: `docker compose build && docker compose up -d`. With an empty database and no dump, `setup` runs the full ingest from OpenAlex (about 40 minutes), which needs the provided `illinois-researchers.csv` in `data/`.
 
@@ -85,7 +85,7 @@ Problems found and fixed during ingest (details in [`docs/data-quality.md`](docs
 
 | Step | How | Model |
 |---|---|---|
-| 1. Understand | Question (+ last turns) → JSON plan: intent, concept groups, date window, sort, limit. JSON schema enforced, `think: false`. Falls back to the chat model with few-shot examples if the finetuned model is missing, and to a rule parser on timeout or an unusable plan | `uiuc-qu:4b` (Qwen3-4B + LoRA, finetuned for this step) |
+| 1. Understand | Question (+ last turns) → JSON plan: intent, concept groups, date window, sort, limit. JSON schema enforced, `think: false`. Falls back to the chat model with few-shot examples if the finetuned model is missing, and to a rule parser on timeout or an unusable plan | [`hodacquan2004/uiuc-qu:4b`](https://ollama.com/hodacquan2004/uiuc-qu) (Qwen3-4B + LoRA, finetuned for this step, Q8_0) |
 | 2. Retrieve | No LLM. **Papers:** candidates from full-text (works matching every concept group) ∪ nearest works to the question ∪ nearest works to the concepts, fused with reciprocal rank fusion, date window, outliers and duplicate versions removed. **Faculty:** keyword evidence per concept group (core term vs synonym, IDF-weighted, head-noun aware) + profile similarity + related papers, ranked so experts covering every part of the question come first | `bge-m3` embeddings, pgvector |
 | 3. Answer | Numbered sources → a short answer that cites only sources actually on topic and says plainly when few match; citations pointing to no source are removed | `qwen3:4b-instruct-2507` |
 
@@ -128,7 +128,7 @@ The database (≈150 MB compressed, over GitHub's 100 MB file limit) is not in t
 
 ## Known limitations
 
-- The finetuned `uiuc-qu:4b` is not on a public model registry yet; without it the assistant uses the chat model with few-shot examples (weaker on sort, see the benchmark).
+- If the finetuned model cannot be pulled, the assistant uses the chat model with few-shot examples (weaker on sort, see the benchmark).
 - Answers take about 10–20 s on a laptop GPU (three model calls). Faculty ranking for broad two-part questions is good but not perfect; the portal's faculty search box is still keyword-only.
 - OpenAlex data changes daily; counts in this README are from the 17–18 Nov 2026 ingest.
 
