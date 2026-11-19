@@ -49,7 +49,7 @@ def _retrieve(request: Request, plan: dict, qv, cv) -> tuple[list[dict], list[di
         if intent in ("faculty", "both"):
             related = search_papers(conn, {**plan, "sort": "relevance"}, qv, cv, cfg, limit=cfg.related_k)
             faculty = search_faculty(_faculty_index(request), plan, qv, related, cfg,
-                                     limit=min(max(plan["limit"], 5), 8))
+                                     limit=max(min(plan["limit"], 8), cfg.max_faculty))
     return papers, faculty
 
 

@@ -81,7 +81,8 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"== {step}", flush=True)
                         run_step(step, s, conn, http, False, False)
                 print(bootstrap(conn, http, database_url=s.database_url, ollama_url=s.ollama_url,
-                                models=[os.environ.get("OLLAMA_CHAT_MODEL", "qwen3:4b"), s.embed_model],
+                                models=[os.environ.get("OLLAMA_CHAT_MODEL", "qwen3:4b-instruct-2507-q4_K_M"),
+                                        s.embed_model],
                                 dump_path=s.data_dir.parent / "db" / "dump" / "portal.sql.gz",
                                 dump_url=os.environ.get("DUMP_URL", ""), run_full_ingest=full_ingest), flush=True)
                 return 0
