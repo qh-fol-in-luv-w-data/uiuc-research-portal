@@ -1,4 +1,4 @@
-.PHONY: up down logs restore dump ingest test test-api test-web e2e screenshots image-dump publish eval attacks
+.PHONY: up down logs restore dump ingest screenshots image-dump publish
 
 # Ports default to 3000 (web) / 8010 (api); override e.g. `make up WEB_PORT=3100`
 WEB_PORT ?= 3000
@@ -24,17 +24,6 @@ dump:
 ingest:        ## rebuild the database from OpenAlex + the faculty CSV (about 40 minutes, mostly embeddings)
 	uv run python -m ingest all
 
-test: test-api test-web
-
-test-api:
-	uv run pytest -q
-
-test-web:
-	cd apps/web && npm test
-
-e2e:           ## end-to-end tests against the running stack, using the local Chrome
-	cd apps/web && E2E_BASE_URL=http://localhost:$(WEB_PORT) npx playwright test
-
 screenshots:
 	cd apps/web && E2E_BASE_URL=http://localhost:$(WEB_PORT) node scripts/screenshots.mjs
 
@@ -53,9 +42,3 @@ publish:       ## build and push db, api and web images for amd64 + arm64
 	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-db:$(TAG) --push db
 	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-api:$(TAG) -f apps/api/Dockerfile --push .
 	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-web:$(TAG) --push apps/web
-
-eval:
-	uv run python eval/run.py
-
-attacks:
-	uv run python eval/attacks.py

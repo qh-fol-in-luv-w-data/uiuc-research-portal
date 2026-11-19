@@ -22,7 +22,3 @@ dev = [
 
 [tool.uv]
 package = false
-
-[tool.pytest.ini_options]
-testpaths = ["tests", "apps/api/api_tests"]
-pythonpath = [".", "apps/api"]

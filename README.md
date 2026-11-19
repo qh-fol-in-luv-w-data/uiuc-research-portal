@@ -92,7 +92,7 @@ Problems found and fixed during ingest (details in [`docs/data-quality.md`](docs
 | 2. Retrieve | No LLM. **Papers:** candidates from full-text (works matching every concept group) ∪ nearest works to the question ∪ nearest works to the concepts, fused with reciprocal rank fusion, date window, outliers and duplicate versions removed. **Faculty:** keyword evidence per concept group (core term vs synonym, IDF-weighted, head-noun aware) + profile similarity + related papers, ranked so experts covering every part of the question come first | `bge-m3` embeddings, pgvector |
 | 3. Answer | Numbered sources → a short answer that cites only sources actually on topic and says plainly when few match; citations pointing to no source are removed | `qwen3:4b-instruct-2507` |
 
-**Query-understanding benchmark** (held-out questions not used for training, 57 total, `finetune/bench_native.py`, Ollama, schema enforced):
+**Query-understanding benchmark** (held-out questions not used for training, 57 total, Ollama, schema enforced; the finetuning code is not part of this repository):
 
 | Model | Valid JSON | Intent | Sort | Dates | Concept recall | p50 latency |
 |---|---|---|---|---|---|---|
@@ -120,16 +120,13 @@ The design was mocked up first, then built in Next.js. Motion follows a "data po
 - Reveals and word-by-word lighting use CSS scroll-driven animations. Content is visible by default, costs no JavaScript, and `prefers-reduced-motion` is respected throughout.
 - Fonts (IBM Plex) are self-hosted, so the build needs no network. Colours were chosen for WCAG AA contrast (not yet audited with a tool), and the page has no horizontal scroll at phone width (tested).
 
-## Tests
+## Quality checks
 
-```bash
-make test   # 109 Python tests (ingest + API) and 10 web unit tests
-make e2e    # 10 Playwright end-to-end tests against the running stack (uses the local Chrome)
-make eval   # 84 real questions (64 English, 20 Vietnamese) through the full stack; writes eval/report.md
-make attacks  # SQL-injection and prompt-injection attacks against the assistant; see docs/security.md
-```
+This branch ships only what runs. The test suites, the assistant evaluation and the attack suite live on the development branch [`feat/ingest`](https://github.com/qh-fol-in-luv-w-data/uiuc-research-portal/tree/feat/ingest):
 
-End-to-end coverage includes: every section renders real data with no console errors; the field filter updates the URL and narrows results; tab keyboard navigation; faculty search → drawer → Esc → focus return; the assistant streaming contract (mocked SSE); the offline state; reduced motion; and the phone layout.
+- 119 Python tests (ingest pipeline, API, assistant understanding, retrieval, output guards, bilingual replies), 12 web unit tests and 10 Playwright end-to-end tests (English and Vietnamese pages, field filter, keyboard tabs, faculty drawer, assistant streaming, offline state, reduced motion, phone layout).
+- Assistant evaluation: 84 real questions through the full stack (64 English, 20 Vietnamese, including cross-language): 79 pass. The misses are "newest" questions where the 4B answer model skips a newer paper it judges only loosely related.
+- Attack suite: 9 SQL-injection payloads and 12 prompt-injection attacks (English and Vietnamese), all blocked. See [`docs/security.md`](docs/security.md).
 
 ## Database dump
 

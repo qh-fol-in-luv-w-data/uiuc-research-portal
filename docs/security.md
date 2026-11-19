@@ -1,8 +1,8 @@
 # Security review — 2026-11-19
 
 Scope: the whole stack as shipped by `docker compose up` (Next.js web, FastAPI API, Postgres, local Ollama), the
-research assistant, the repository and its history. Re-run the attack suite with `make attacks` (needs the stack and
-Ollama running); it writes `eval/attacks-report.md`.
+research assistant, the repository and its history. The attack suite (`eval/attacks.py`, `make attacks`) lives on the
+development branch `feat/ingest`, with the test suites.
 
 ## Automated scans
 
