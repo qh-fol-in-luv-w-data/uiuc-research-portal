@@ -16,35 +16,42 @@ def ts_or(terms: list[str]) -> str:
     return " OR ".join(f'"{t}"' if " " in t else t for t in (t.strip().replace('"', "") for t in terms) if t)
 
 
-def search_papers(conn: psycopg.Connection, plan: dict, qvec: np.ndarray, group_vecs: list[np.ndarray],
-                  cfg: ChatConfig, limit: int | None = None) -> list[dict]:
-    """Hybrid search: full-text ∪ vector candidates, RRF fusion, every concept group must match
-    (by text, or by meaning: cosine(work, group) >= tau), date window, then the plan's sort."""
+def search_papers(conn: psycopg.Connection, plan: dict, qvec: np.ndarray, cvec: np.ndarray, cfg: ChatConfig,
+                  limit: int | None = None) -> list[dict]:
+    """Hybrid candidates fused with reciprocal rank fusion (RRF):
+      - full-text: works matching EVERY concept group by text (AND of ORs),
+      - meaning: nearest works to the question embedding,
+      - meaning: nearest works to the concept embedding (core terms of every group).
+    Then the date window, the top `limit` by fused rank, presented in the plan's order (recent/cited/relevance).
+    Per-group concept vectors proved unable to separate on- from off-topic works (eval 2026-11-19), so the final
+    on-topic judgement is left to the answer step, which cites only relevant sources."""
     groups = [g for g in plan["concepts"] if g]
-    all_terms = [t for g in groups for t in g]
-    params: dict = {"pool": cfg.pool, "qvec": qvec, "all": ts_or(all_terms) or plan["standalone_question"]}
-    group_cols = []
-    for i, (g, v) in enumerate(zip(groups, group_vecs)):
-        params[f"g{i}"], params[f"v{i}"] = ts_or(g), v
-        group_cols.append(f"(w.tsv @@ websearch_to_tsquery('english', %(g{i})s)) AS m{i},"
-                          f" 1 - (w.embedding <=> %(v{i})s) AS s{i}")
+    params: dict = {"pool": cfg.pool, "qvec": qvec, "cvec": cvec}
+    tsq = []
+    for i, g in enumerate(groups):
+        params[f"g{i}"] = ts_or(g)
+        tsq.append(f"websearch_to_tsquery('english', %(g{i})s)")
+    and_query = " && ".join(tsq) if tsq else "websearch_to_tsquery('english', %(qtext)s)"
+    params["qtext"] = plan["standalone_question"]
+    group_cols = "".join(f", w.tsv @@ {q} AS m{i}" for i, q in enumerate(tsq))
     sql = f"""
         WITH fts AS (
           SELECT w.id, row_number() OVER (ORDER BY ts_rank(w.tsv, q) DESC, w.id) AS r
-          FROM works w, websearch_to_tsquery('english', %(all)s) q
-          WHERE w.tsv @@ q AND {LIVE}
-          ORDER BY ts_rank(w.tsv, q) DESC, w.id LIMIT %(pool)s),
-        vec AS (
+          FROM works w, (SELECT {and_query} AS q) x
+          WHERE w.tsv @@ q AND {LIVE} ORDER BY ts_rank(w.tsv, q) DESC, w.id LIMIT %(pool)s),
+        vq AS (
           SELECT w.id, row_number() OVER (ORDER BY w.embedding <=> %(qvec)s, w.id) AS r
-          FROM works w WHERE {LIVE} AND w.embedding IS NOT NULL
-          ORDER BY w.embedding <=> %(qvec)s, w.id LIMIT %(pool)s),
+          FROM works w WHERE {LIVE} AND w.embedding IS NOT NULL ORDER BY w.embedding <=> %(qvec)s, w.id LIMIT %(pool)s),
+        vc AS (
+          SELECT w.id, row_number() OVER (ORDER BY w.embedding <=> %(cvec)s, w.id) AS r
+          FROM works w WHERE {LIVE} AND w.embedding IS NOT NULL ORDER BY w.embedding <=> %(cvec)s, w.id LIMIT %(pool)s),
         cand AS (
-          SELECT id, min(fr) AS fr, min(vr) AS vr FROM (
-            SELECT id, r AS fr, NULL::bigint AS vr FROM fts UNION ALL SELECT id, NULL, r FROM vec) u
-          GROUP BY id)
+          SELECT id, sum(1.0 / ({cfg.k_rrf} + r)) AS rrf FROM (
+            SELECT * FROM fts UNION ALL SELECT * FROM vq UNION ALL SELECT * FROM vc) u GROUP BY id)
         SELECT w.id, w.title, w.publication_date, w.type, w.venue_name, w.cited_by_count, w.doi, t.field,
-               left(w.abstract, 600), c.fr, c.vr{"," if group_cols else ""} {", ".join(group_cols)}
-        FROM cand c JOIN works w ON w.id = c.id LEFT JOIN topics t ON t.id = w.primary_topic_id"""
+               left(w.abstract, 600), c.rrf{group_cols}
+        FROM cand c JOIN works w ON w.id = c.id LEFT JOIN topics t ON t.id = w.primary_topic_id
+        ORDER BY c.rrf DESC, w.id"""
     with conn.cursor() as cur:
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -55,25 +62,20 @@ def search_papers(conn: psycopg.Connection, plan: dict, qvec: np.ndarray, group_
     d_to = date.fromisoformat(plan["date_to"]) if plan.get("date_to") else None
     hits = []
     for r in rows:
-        wid, title, pub, typ, venue, cited, doi, field, abstract, fr, vr = r[:11]
-        matched_by = []
-        for i in range(len(groups)):
-            m, s = r[11 + 2 * i], r[12 + 2 * i]
-            matched_by.append("text" if m else "meaning" if s is not None and s >= cfg.tau else None)
-        if None in matched_by:
-            continue
+        wid, title, pub, typ, venue, cited, doi, field, abstract, rrf = r[:10]
         if pub is not None and pub > today:
             continue  # future issue dates are not "published" yet
         if (d_from and (pub is None or pub < d_from)) or (d_to and (pub is None or pub > d_to)):
             continue
-        rrf = (1 / (cfg.k_rrf + fr) if fr else 0.0) + (1 / (cfg.k_rrf + vr) if vr else 0.0)
         hits.append({"id": wid, "title": title, "publication_date": pub, "type": typ, "venue": venue,
-                     "cited_by_count": cited, "doi": doi, "field": field, "abstract": abstract,
-                     "score": rrf, "matched_by": matched_by})
+                     "cited_by_count": cited, "doi": doi, "field": field, "abstract": abstract, "score": float(rrf),
+                     "matched_by": ["text" if m else None for m in r[10:]]})
+        if len(hits) >= (limit or plan["limit"]):
+            break
     key = {"recent": lambda h: (h["publication_date"] or date.min, h["score"]),
-           "cited": lambda h: (h["cited_by_count"], h["score"])}.get(plan["sort"], lambda h: (h["score"],))
-    hits.sort(key=key, reverse=True)
-    hits = hits[: (limit or plan["limit"])]
+           "cited": lambda h: (h["cited_by_count"], h["score"])}.get(plan["sort"])
+    if key:
+        hits.sort(key=key, reverse=True)
     _attach_authors(conn, hits)
     return hits
 

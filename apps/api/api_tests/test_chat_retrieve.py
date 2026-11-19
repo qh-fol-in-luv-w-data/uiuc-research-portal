@@ -5,7 +5,7 @@ from app.chat.retrieve import search_papers
 from ingest.load_works import load_works
 from tests.factories import UIUC, make_author, make_work
 
-CFG = ChatConfig(tau=0.55, pool=50)
+CFG = ChatConfig(pool=50)
 
 
 def axis(*idx):
@@ -17,8 +17,8 @@ def axis(*idx):
 
 PLAN = {"intent": "papers", "standalone_question": "recent papers on AI in war", "date_from": None, "date_to": None,
         "concepts": [["ai", "machine learning"], ["war", "military", "armed conflict"]], "sort": "recent", "limit": 5}
-GROUP_VECS = [axis(0), axis(1)]
 QVEC = axis(0, 1)
+CVEC = axis(0, 1)
 
 
 def seed(db):
@@ -39,23 +39,22 @@ def seed(db):
     db.commit()
 
 
-def test_concept_groups_must_all_match_by_text_or_meaning(db):
+def test_text_and_meaning_candidates_ranked_by_fusion(db):
     seed(db)
-    ids = [h["id"] for h in search_papers(db, PLAN, QVEC, GROUP_VECS, CFG)]
-    assert "WAIONLY" not in ids          # matches only the AI group
-    assert "WVEC" in ids                 # no keyword for either group, kept by meaning (cosine 0.71 >= tau)
-    assert "WOUT" not in ids             # outlier never returned
+    hits = search_papers(db, {**PLAN, "sort": "relevance"}, QVEC, CVEC, CFG)
+    ids = [h["id"] for h in hits]
+    assert ids[0] == "WBOTH"              # matches every group by text and is closest in meaning
+    assert ids.index("WVEC") < ids.index("WAIONLY")  # no keywords, but closest in meaning to the question
+    assert "WOUT" not in ids and "WFUT" not in ids   # outliers and future-dated works never returned
+    assert hits[0]["matched_by"] == ["text", "text"] and hits[0]["uiuc_authors"] == ["Jane Doe"]
 
 
-def test_recent_sort_excludes_future_dates(db):
+def test_recent_sort_orders_by_date(db):
     seed(db)
-    hits = search_papers(db, PLAN, QVEC, GROUP_VECS, CFG)
-    assert [h["id"] for h in hits] == ["WVEC", "WBOTH"]
-    assert hits[0]["uiuc_authors"] == ["Jane Doe"] and hits[0]["matched_by"] == ["meaning", "meaning"]
-    assert hits[1]["matched_by"] == ["text", "text"]
+    assert [h["id"] for h in search_papers(db, PLAN, QVEC, CVEC, CFG)] == ["WAIONLY", "WVEC", "WBOTH"]
 
 
 def test_date_window_and_cited_sort(db):
     seed(db)
     plan = {**PLAN, "sort": "cited", "date_from": "2025-06-01", "date_to": "2025-12-31"}
-    assert [h["id"] for h in search_papers(db, plan, QVEC, GROUP_VECS, CFG)] == ["WVEC"]
+    assert [h["id"] for h in search_papers(db, plan, QVEC, CVEC, CFG)] == ["WVEC"]
