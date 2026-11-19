@@ -1,11 +1,12 @@
-import { proxy } from "@/lib/server/proxy";
+import { proxy, safeSegment } from "@/lib/server/proxy";
 
 type Ctx = { params: Promise<{ path: string[] }> };
 
-export async function GET(request: Request, { params }: Ctx) {
-  return proxy(request, `/api/${(await params).path.join("/")}`);
+async function forward(request: Request, { params }: Ctx) {
+  const { path } = await params;
+  if (!path.every(safeSegment)) return Response.json({ error: "not_found", detail: "Not found." }, { status: 404 });
+  return proxy(request, `/api/${path.map(encodeURIComponent).join("/")}`);
 }
 
-export async function POST(request: Request, { params }: Ctx) {
-  return proxy(request, `/api/${(await params).path.join("/")}`);
-}
+export const GET = forward;
+export const POST = forward;

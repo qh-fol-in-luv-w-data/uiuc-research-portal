@@ -13,6 +13,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { Header } from "@/components/sections/Header";
 import { Hero } from "@/components/sections/Hero";
 import { SectionError } from "@/components/sections/SectionError";
+import { getI18n } from "@/i18n/server";
 import { getOverview, getStats, getWorks } from "@/lib/api";
 
 // Every data section waits for a request (connection()) so builds never need the API;
@@ -23,7 +24,7 @@ async function HeroData() {
   try {
     return <Hero overview={await getOverview()} />;
   } catch {
-    return <div className="bg-navy px-6 py-16"><SectionError what="The research overview" /></div>;
+    return <div className="bg-navy px-6 py-16"><SectionError what={(await getI18n()).t.errors.overview} /></div>;
   }
 }
 
@@ -34,7 +35,7 @@ async function FocusData() {
       getStats("fields"), getStats("rising_topics"), getStats("top_faculty"), getStats("by_field")]);
     return <FocusAreas fields={fields} rising={rising} topFaculty={topFaculty} byField={byField} />;
   } catch {
-    return <SectionError what="Research focus areas" />;
+    return <SectionError what={(await getI18n()).t.sections.focus[0]} />;
   }
 }
 
@@ -44,7 +45,7 @@ async function OutputData() {
     const [monthly, types, venues, overview] = await Promise.all([getStats("monthly"), getStats("types"), getStats("top_venues"), getOverview()]);
     return <Output monthly={monthly} types={types} venues={venues} oaShare={overview.oa_share} />;
   } catch {
-    return <SectionError what="Scholarly output" />;
+    return <SectionError what={(await getI18n()).t.sections.output[0]} />;
   }
 }
 
@@ -54,7 +55,7 @@ async function NotableData() {
     const [cited, recent] = await Promise.all([getWorks({ sort: "cited" }), getWorks({ sort: "recent" })]);
     return <Notable initial={{ cited, recent }} />;
   } catch {
-    return <SectionError what="Notable publications" />;
+    return <SectionError what={(await getI18n()).t.sections.notable[0]} />;
   }
 }
 
@@ -64,13 +65,14 @@ async function CollabData() {
     const [partners, mapPoints, overview] = await Promise.all([getStats("top_partners"), getStats("partner_map"), getOverview()]);
     return <Collaboration partners={partners} mapPoints={mapPoints} partnerCount={overview.partner_institutions} institution={overview.institution} />;
   } catch {
-    return <SectionError what="Collaboration data" />;
+    return <SectionError what={(await getI18n()).t.errors.collab} />;
   }
 }
 
 const Skeleton = ({ h = "h-96" }: { h?: string }) => <div aria-hidden="true" className={`${h} animate-pulse rounded-2xl bg-surface`} />;
 
-export default function Page() {
+export default async function Page() {
+  const { t } = await getI18n();
   return (
     <>
       <Header />
@@ -81,26 +83,23 @@ export default function Page() {
         <Suspense fallback={<Skeleton h="h-[560px]" />}><FocusData /></Suspense>
         <Suspense fallback={<Skeleton />}><OutputData /></Suspense>
         <section id="notable" aria-labelledby="notable-title" className="flex scroll-mt-24 flex-col gap-6">
-          <SectionHeading id="notable" title="Notable publications"
-            intro="The most cited and the newest UIUC works. Names in bold are faculty in the directory; select one to open their profile." />
+          <SectionHeading id="notable" title={t.sections.notable[0]} intro={t.sections.notable[1]} />
           <Suspense fallback={<Skeleton />}><NotableData /></Suspense>
         </section>
         <section id="faculty" aria-labelledby="faculty-title" className="flex scroll-mt-24 flex-col gap-6">
-          <SectionHeading id="faculty" title="Faculty expertise"
-            intro="Search 999 faculty profiles by research keyword. Profiles linked to OpenAlex also show topics and recent publications." />
+          <SectionHeading id="faculty" title={t.sections.faculty[0]} intro={t.sections.faculty[1]} />
           <Suspense fallback={<Skeleton />}><FacultySearch /></Suspense>
         </section>
         <Suspense fallback={<Skeleton h="h-[640px]" />}><CollabData /></Suspense>
         <section id="assistant" aria-labelledby="assistant-title" className="flex scroll-mt-24 flex-col gap-6">
-          <SectionHeading id="assistant" title="AI research assistant"
-            intro="Answers questions from the UIUC records on this page and cites every source. It runs on a local model, so nothing you ask leaves this server." />
+          <SectionHeading id="assistant" title={t.sections.assistant[0]} intro={t.sections.assistant[1]} />
           <Assistant />
         </section>
       </main>
       <footer className="bg-navy text-hero-muted">
         <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-x-6 gap-y-2 px-[max(16px,env(safe-area-inset-left,0px))] py-6 text-sm sm:px-6">
-          <span>Data: <a href="https://openalex.org" className="underline">OpenAlex</a> (CC0) · faculty directory provided with the assessment · map © OpenStreetMap contributors</span>
-          <span>Not an official University of Illinois site</span>
+          <span>{t.footer.data} <a href="https://openalex.org" className="underline">OpenAlex</a> {t.footer.rest}</span>
+          <span>{t.footer.unofficial}</span>
         </div>
       </footer>
       <FacultyDrawer />

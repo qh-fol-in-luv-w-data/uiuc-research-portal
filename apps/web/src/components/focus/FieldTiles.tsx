@@ -1,12 +1,13 @@
 "use client";
 
-import { fmt } from "@/lib/format";
+import { useI18n } from "@/i18n/client";
 import type { StatsData } from "@/lib/types";
 import { useField } from "@/lib/useField";
 
 const SHADES = ["bg-navy", "bg-navy-2", "bg-navy-2", "bg-navy-2", "bg-navy-3"];
 
 export function FieldTiles({ fields }: { fields: StatsData["fields"] }) {
+  const { t, f: fm } = useI18n();
   const [field, setField] = useField();
   const shown = fields.slice(0, 12);
   return (
@@ -18,13 +19,13 @@ export function FieldTiles({ fields }: { fields: StatsData["fields"] }) {
             onClick={() => setField(null)}
             className="inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink hover:border-accent"
           >
-            Showing <strong>{field}</strong> across the page · Clear filter
+            {t.focus.showing} <strong>{fm.field(field)}</strong> {t.focus.across}
           </button>
         ) : (
-          <p className="text-sm text-muted">Select a field to see its subfields, rising topics and leading faculty, and to filter the page.</p>
+          <p className="text-sm text-muted">{t.focus.hint}</p>
         )}
       </div>
-      <ul className="flex flex-wrap gap-1.5" aria-label="Research fields by number of publications">
+      <ul className="flex flex-wrap gap-1.5" aria-label={t.focus.tilesLabel}>
         {shown.map((f, i) => {
           const on = field === f.field;
           const dim = field !== null && !on;
@@ -42,9 +43,9 @@ export function FieldTiles({ fields }: { fields: StatsData["fields"] }) {
                   on ? "bg-accent text-navy" : `${SHADES[Math.min(i, SHADES.length - 1)]} text-hero-ink`
                 } ${dim ? "opacity-45" : ""} ${i < 4 ? "min-h-32" : "min-h-24"}`}
               >
-                <span className="text-[15px] font-semibold leading-snug">{f.field}</span>
-                <span className="tabular font-mono text-[13px] opacity-85">{fmt(f.count)} works</span>
-                <span className="line-clamp-1 text-xs opacity-80">Top: {f.subfields[0]?.name}</span>
+                <span className="text-[15px] font-semibold leading-snug">{fm.field(f.field)}</span>
+                <span className="tabular font-mono text-[13px] opacity-85">{t.focus.works(fm.fmt(f.count))}</span>
+                <span className="line-clamp-1 text-xs opacity-80">{t.focus.topSub} {f.subfields[0]?.name}</span>
               </button>
             </li>
           );

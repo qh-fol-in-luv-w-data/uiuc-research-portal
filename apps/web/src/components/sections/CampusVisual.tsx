@@ -1,17 +1,20 @@
 import Image from "next/image";
 
+import { getI18n } from "@/i18n/server";
+import { safeHref } from "@/lib/safeUrl";
 import type { Institution } from "@/lib/types";
 
 /** Campus photo with credit, or a designed placeholder until data/institution.json lists images. */
-export function CampusVisual({ institution }: { institution: Institution | null }) {
+export async function CampusVisual({ institution }: { institution: Institution | null }) {
+  const { t } = await getI18n();
   const img = institution?.images?.[0];
   if (img) {
     return (
       <figure className="overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/30">
         <Image src={img.url} alt={img.alt} width={1920} height={1440} sizes="(min-width: 1024px) 40vw, 100vw" className="aspect-[16/10] h-auto w-full object-cover" priority />
         <figcaption className="bg-black/40 px-3 py-1.5 text-[11px] text-hero-muted">
-          Photo: {img.author} ({img.license}),{" "}
-          <a href={img.source} className="underline decoration-dotted hover:text-hero-ink">Wikimedia Commons</a>
+          {t.hero.photo}: {img.author} ({img.license}),{" "}
+          <a href={safeHref(img.source)} className="underline decoration-dotted hover:text-hero-ink">Wikimedia Commons</a>
         </figcaption>
       </figure>
     );
@@ -20,7 +23,7 @@ export function CampusVisual({ institution }: { institution: Institution | null 
     <div className="grid aspect-[16/10] w-full place-items-center rounded-2xl border border-white/10 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.05)_0_14px,transparent_14px_28px)] p-6 text-center text-sm text-hero-muted">
       <div className="flex flex-col items-center gap-2">
         <span className="font-display text-2xl font-bold text-hero-ink">{institution?.city ?? "Urbana–Champaign, Illinois"}</span>
-        <span>Founded {institution?.founded ?? 1867}</span>
+        <span>{t.hero.founded} {institution?.founded ?? 1867}</span>
         <span className="font-mono text-xs">
           {institution?.latitude?.toFixed(2)}° N, {Math.abs(institution?.longitude ?? 0).toFixed(2)}° W
         </span>

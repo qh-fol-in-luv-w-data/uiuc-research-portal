@@ -2,17 +2,20 @@ import { CountUp } from "@/components/motion/CountUp";
 import { LineReveal } from "@/components/motion/LineReveal";
 import { Parallax } from "@/components/motion/Parallax";
 import { Reveal } from "@/components/motion/Reveal";
+import { getI18n } from "@/i18n/server";
 import type { Overview } from "@/lib/types";
 
 import { CampusVisual } from "./CampusVisual";
 
-export function Hero({ overview }: { overview: Overview }) {
-  const linkedPct = ((overview.faculty_linked / overview.faculty) * 100).toFixed(1);
+export async function Hero({ overview }: { overview: Overview }) {
+  const { t, f } = await getI18n();
+  const k = t.hero.kpis;
   const kpis = [
-    { label: "Publications", value: overview.works, note: "articles, preprints, conference papers, chapters, reviews" },
-    { label: "Citations received", value: overview.citations, note: "to those publications, per OpenAlex" },
-    { label: "Open access", value: overview.oa_share * 100, note: "free to read at publication", percent: true },
-    { label: "Faculty profiles", value: overview.faculty, note: `${overview.faculty_linked} matched to OpenAlex authors (${linkedPct}%)` },
+    { label: k.works[0], value: overview.works, note: k.works[1] },
+    { label: k.citations[0], value: overview.citations, note: k.citations[1] },
+    { label: k.oa[0], value: overview.oa_share * 100, note: k.oa[1], percent: true },
+    { label: k.faculty[0], value: overview.faculty,
+      note: t.hero.linked(f.fmt(overview.faculty_linked), f.pct(overview.faculty_linked / overview.faculty)) },
   ];
   return (
     <section id="top" className="relative isolate overflow-hidden bg-navy text-hero-ink">
@@ -26,16 +29,15 @@ export function Hero({ overview }: { overview: Overview }) {
       <div className="mx-auto grid max-w-7xl items-end gap-10 px-[max(16px,env(safe-area-inset-left,0px))] pb-12 pt-14 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:pt-20">
         <div className="flex min-w-0 flex-col gap-5">
           <p className="font-mono text-xs uppercase tracking-[0.12em] text-[#ffb48a]">
-            University of Illinois Urbana-Champaign · Research profile
+            {t.hero.eyebrow}
           </p>
           <LineReveal
             className="font-display text-[clamp(2.4rem,5.4vw,4rem)] font-bold leading-[1.02] [text-wrap:balance]"
-            lines={["What Illinois researchers", "published in the", "last two years"]}
+            lines={[...t.hero.lines]}
           />
           <Reveal delay={0.45}>
             <p className="max-w-[60ch] text-lg leading-relaxed text-hero-muted">
-              Every number on this page is computed from OpenAlex records affiliated with UIUC, linked to{" "}
-              {overview.faculty.toLocaleString("en-US")} faculty profiles.
+              {t.hero.lead(f.fmt(overview.faculty))}
             </p>
           </Reveal>
         </div>

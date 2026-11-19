@@ -1,4 +1,4 @@
-.PHONY: up down logs restore dump ingest test test-api test-web e2e screenshots image-dump publish
+.PHONY: up down logs restore dump ingest test test-api test-web e2e screenshots image-dump publish eval attacks
 
 # Ports default to 3000 (web) / 8010 (api); override e.g. `make up WEB_PORT=3100`
 WEB_PORT ?= 3000
@@ -56,3 +56,6 @@ publish:       ## build and push db, api and web images for amd64 + arm64
 
 eval:
 	uv run python eval/run.py
+
+attacks:
+	uv run python eval/attacks.py

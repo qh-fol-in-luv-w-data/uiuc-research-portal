@@ -23,6 +23,7 @@ class ChatConfig:
     keep_alive: str = field(default_factory=lambda: _env("OLLAMA_KEEP_ALIVE", "30m"))
     qu_timeout: float = 20.0
     gen_timeout: float = 90.0
+    max_concurrent: int = 2  # chats answered at once; one local model server, more would only queue (429 instead)
     # retrieval
     pool: int = 200            # candidates from each of full-text and vector search
     k_rrf: int = 60            # reciprocal rank fusion constant

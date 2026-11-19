@@ -18,14 +18,20 @@ SYNONYMS: dict[str, list[str]] = {
     "climate change": ["global warming", "climate"],
     "llm": ["large language models", "language models"],
 }
-FACULTY = re.compile(r"\b(faculty|professors?|researchers?|experts?|people|scientists?|who)\b")
-PAPERS = re.compile(r"\b(papers?|publications?|articles?|works?|studies|research)\b")
+FACULTY = re.compile(r"\b(faculty|professors?|researchers?|experts?|people|scientists?|who)\b"
+                     r"|giảng viên|giáo sư|nhà (?:khoa học|nghiên cứu)|chuyên gia|^ai\b")
+PAPERS = re.compile(r"\b(papers?|publications?|articles?|works?|studies|research)\b|bài báo|công bố|công trình")
 LEAD = re.compile(
-    r"^.*?\b(?:on|about|regarding|related to|in the area of|in the field of|work(?:s|ing)? on|research(?:es|ing)? on|studying)\s+",
+    r"^.*?(?:\b(?:on|about|regarding|related to|in the area of|in the field of|work(?:s|ing)? on|research(?:es|ing)? on|"
+    r"studying)|(?<!\w)(?:về|liên quan đến|trong lĩnh vực))\s+",
 )
+RECENT = re.compile(r"\b(recent|latest|newest|new)\b|mới nhất|gần đây|mới đây|gần nhất")
+CITED = re.compile(r"\b(most cited|highly cited|influential|top|best known|well known|landmark|seminal|most important|"
+                   r"key papers)\b|trích dẫn nhiều|nổi bật|ảnh hưởng|quan trọng nhất|kinh điển")
 # eval 2026-11-19: the planner refused explicit topic requests ("Papers on underwater basket weaving") and broad ones
-TOPIC_REQUEST = re.compile(r"\b(papers?|publications?|articles?|research|studies|work|faculty|professors?|experts?|who)\b"
-                           r".*\b(on|about|regarding|related to|in the (?:area|field) of)\s+\w")
+TOPIC_REQUEST = re.compile(r"(\b(papers?|publications?|articles?|research|studies|work|faculty|professors?|experts?|who)\b"
+                           r".*\b(on|about|regarding|related to|in the (?:area|field) of)\s+\w)"
+                           r"|((bài báo|công bố|nghiên cứu|giảng viên).*(?<!\w)(về|liên quan đến)\s+\w)")
 BROAD = re.compile(r"\b(research|stud(?:y|ies)|publish\w*|faculty|professors?|uiuc|illinois)\b|nghiên cứu", re.I)
 _VI = re.compile(r"[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]", re.I)
 _VI_WHO = re.compile(r"^\s*ai\b|giảng viên|giáo sư|nhà (?:khoa học|nghiên cứu)|chuyên gia", re.I)
@@ -36,12 +42,14 @@ def vietnamese_who(question: str) -> bool:
     return bool(_VI.search(question) and _VI_WHO.search(question))
 
 
-FILLER = re.compile(r"\b(uiuc|illinois|university of illinois|the|recent|latest|newest|most cited|papers?|publications?)\b")
+FILLER = re.compile(r"\b(uiuc|illinois|university of illinois|the|recent|latest|newest|most cited|papers?|publications?)\b"
+                    r"|(?<!\w)(của|các|những|mới nhất|gần đây|được trích dẫn nhiều nhất|trích dẫn nhiều nhất|là gì|nào|"
+                    r"bài báo|công bố)(?!\w)")
 
 
 def _terms(phrase: str) -> list[list[str]]:
     groups = []
-    for part in re.split(r"\s+(?:in|and|for|of|with)\s+|,", phrase):
+    for part in re.split(r"\s+(?:in|and|for|of|with|trong|và|cho|với)\s+|,", phrase):
         core = re.sub(r"\s+", " ", FILLER.sub(" ", part)).strip(" ?.!")
         if len(core) >= 2:
             groups.append([core] + [s for s in SYNONYMS.get(core, []) if s != core])
@@ -52,17 +60,16 @@ def parse(question: str, today: str) -> dict:
     q = question.lower().strip()
     wants_faculty, wants_papers = bool(FACULTY.search(q)), bool(PAPERS.search(q))
     intent = "both" if wants_faculty and wants_papers and "work on" not in q else "faculty" if wants_faculty else "papers"
-    sort = ("recent" if re.search(r"\b(recent|latest|newest|new)\b", q)
-            else "cited" if re.search(r"\b(most cited|highly cited|influential|top|best known|well known|landmark|seminal|"
-                                       r"most important|key papers)\b", q) else "relevance")
+    sort = "recent" if RECENT.search(q) else "cited" if CITED.search(q) else "relevance"
     limit_m = re.search(r"\b(?:top|first)\s+(\d{1,2})\b|\b(\d{1,2})\s+(?:papers|publications|faculty|people)\b", q)
     limit = min(20, max(1, int(next(g for g in limit_m.groups() if g)))) if limit_m else 5
     date_from = date_to = None
-    if m := re.search(r"\b(?:since|from|after)\s+(20\d\d)\b", q):
-        date_from = f"{m.group(1)}-01-01"
-    elif m := re.search(r"\bin\s+(20\d\d)\b", q):
-        date_from, date_to = f"{m.group(1)}-01-01", f"{m.group(1)}-12-31"
-    body = re.sub(r"\b(?:since|from|after|in)\s+20\d\d\b", " ", q)
+    if m := re.search(r"\b(?:since|from|after)\s+(20\d\d)\b|(?:từ|kể từ|sau)(?: năm)?\s+(20\d\d)\b", q):
+        date_from = f"{m.group(1) or m.group(2)}-01-01"
+    elif m := re.search(r"\bin\s+(20\d\d)\b|(?:trong )?năm\s+(20\d\d)\b", q):
+        y = m.group(1) or m.group(2)
+        date_from, date_to = f"{y}-01-01", f"{y}-12-31"
+    body = re.sub(r"\b(?:since|from|after|in)\s+20\d\d\b|(?:từ|kể từ|sau|trong)?\s*năm\s+20\d\d\b", " ", q)
     m = LEAD.match(body)
     phrase = body[m.end():] if m else body
     phrase = re.sub(r"^(?:top\s+\d+\s+|\d+\s+)", "", phrase)
