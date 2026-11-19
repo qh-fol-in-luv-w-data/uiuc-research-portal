@@ -53,3 +53,6 @@ publish:       ## build and push db, api and web images for amd64 + arm64
 	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-db:$(TAG) --push db
 	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-api:$(TAG) -f apps/api/Dockerfile --push .
 	docker buildx build --platform $(PLATFORMS) $(ANNOTATE) -t $(REGISTRY)/uiuc-research-portal-web:$(TAG) --push apps/web
+
+eval:
+	uv run python eval/run.py
