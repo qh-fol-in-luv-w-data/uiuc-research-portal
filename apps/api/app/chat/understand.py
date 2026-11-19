@@ -27,6 +27,13 @@ async def understand(question: str, history: list[dict] | None, today: str, olla
     plan = qu.parse(raw) if raw else None
     if qu.needs_fallback(plan):
         return rules.parse(question, today), "rules"
+    if plan["intent"] == "out_of_scope":
+        if rules.TOPIC_REQUEST.search(question.lower()):
+            return rules.parse(question, today), "rules"
+        if rules.BROAD.search(question):
+            plan["broad"] = True  # "What research does UIUC do?": point to topics instead of refusing
+    elif plan["intent"] == "papers" and rules.vietnamese_who(question):
+        plan["intent"] = "faculty"
     if source == "fewshot":
         # few-shot models over-predict "recent" (sort 61-73% on held-out sets); explicit wording is reliable (89%+)
         plan["sort"] = rules.parse(question, today)["sort"]

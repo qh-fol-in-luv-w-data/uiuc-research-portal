@@ -13,11 +13,15 @@ SYSTEM = (
     "Every numbered source is a UIUC publication from the last two years or a UIUC faculty member, retrieved by search, "
     "so some may be off-topic. Answer using ONLY these sources. "
     "Mention the sources that are about the question's topic, with a few words on what each contributes, "
-    "and cite each one as [n] with its number. List papers newest first when the question asks for recent work, "
-    "most cited first when it asks for top or most cited work, otherwise most relevant first. "
+    "and cite each one as [n] with its number. The sources are already in the order the question needs (stated above "
+    "them): keep that order, skip only off-topic ones, and call a source the newest or most cited only if it is the "
+    "first on-topic one. "
     "Ignore off-topic sources. If no source is squarely on the topic, say so plainly and name the closest ones and how "
     "they relate. Never invent papers, people or facts. Answer in the language of the question, in 3 to 5 sentences."
 )
+BROAD = ("UIUC research spans engineering, computer science, agriculture, life sciences, physics and more; the Research "
+         "focus areas section above shows the main fields. Ask me about a specific topic, for example \"most recent papers "
+         "on quantum computing\" or \"which faculty work on crop genetics?\"")
 OUT_OF_SCOPE = ("I can only help with research at the University of Illinois Urbana-Champaign (UIUC): recent publications, "
                 "notable papers and faculty expertise. Try asking about a research topic.")
 
@@ -42,10 +46,10 @@ def build_sources(papers: list[dict], faculty: list[dict], abstract_chars: int =
         meta = " · ".join(x for x in (kind, month(p["publication_date"]), venue) if x)
         url = p["doi"] or f"https://openalex.org/{p['id']}"
         ui.append({"n": n, "kind": "work", "id": p["id"], "title": p["title"], "meta": meta, "url": url})
-        authors = ", ".join(p.get("uiuc_authors", [])[:4]) or "not listed"
+        authors = ", ".join(p.get("uiuc_authors", [])[:4])
         abstract = re.sub(r"\s+", " ", (p.get("abstract") or "")).strip()[:abstract_chars]
         lines.append(f"[{n}] {p['title']} ({kind}, {month(p['publication_date'])}{', ' + venue if venue else ''}; "
-                     f"{p['cited_by_count']} citations). UIUC authors: {authors}. {abstract}")
+                     f"{p['cited_by_count']} citations).{' UIUC authors: ' + authors + '.' if authors else ''} {abstract}")
     for f in faculty:
         n = len(ui) + 1
         expertise = ", ".join(f["matched_keywords"][:5]) or "related research"
@@ -58,20 +62,25 @@ def build_sources(papers: list[dict], faculty: list[dict], abstract_chars: int =
     return ui, "\n".join(lines)
 
 
-def build_messages(question: str, history: list[dict] | None, sources_text: str) -> list[dict]:
+ORDER = {"recent": "sorted newest first, so [1] is the newest", "cited": "sorted most cited first",
+         "relevance": "most relevant first"}
+
+
+def build_messages(question: str, history: list[dict] | None, sources_text: str, sort: str = "relevance") -> list[dict]:
     msgs = [{"role": "system", "content": SYSTEM}]
     for turn in (history or [])[-4:]:
         msgs.append({"role": turn["role"], "content": turn["content"]})
-    msgs.append({"role": "user", "content": f"Sources:\n{sources_text}\n\nQuestion: {question}"})
+    msgs.append({"role": "user", "content": f"Sources ({ORDER.get(sort, ORDER['relevance'])}):\n{sources_text}\n\nQuestion: {question}"})
     return msgs
 
 
-_CITE = re.compile(r"\s*\[(\d+|n)\]")
+_CITE = re.compile(r"\s*\[n?(\d+|n)\]")
 
 
 def clean_citations(text: str, n_sources: int) -> str:
     """Drop citations that point to no source (and a literal "[n]"), keeping valid ones."""
     def keep(m: re.Match) -> str:
         v = m.group(1)
-        return m.group(0) if v.isdigit() and 1 <= int(v) <= n_sources else ""
+        lead = m.group(0)[: m.group(0).index("[")]
+        return f"{lead}[{v}]" if v.isdigit() and 1 <= int(v) <= n_sources else ""  # "[n2]" -> "[2]"
     return re.sub(r" {2,}", " ", _CITE.sub(keep, text)).strip()

@@ -93,3 +93,13 @@ def test_ollama_down_returns_503(db, tmp_path):
 
 def test_clean_citations():
     assert clean_citations("A [1], B [3] and C [n].", 2) == "A [1], B and C."
+
+
+def test_clean_citations_normalizes_n_prefix():
+    assert clean_citations("See [n2] and [n9].", 3) == "See [2] and."
+
+
+def test_prompt_states_source_order():
+    from app.chat.answer import build_messages
+    assert "newest first" in build_messages("q", None, "[1] x", sort="recent")[-1]["content"]
+    assert "most cited first" in build_messages("q", None, "[1] x", sort="cited")[-1]["content"]
