@@ -4,7 +4,7 @@ A single-page research portal for the University of Illinois Urbana-Champaign, b
 
 ![Desktop](docs/screenshots/desktop.png)
 
-> **Status:** the portal (data pipeline, read API, web) is complete and tested. The assistant UI is built against its streaming contract; the retrieval + generation backend (`POST /api/chat`) is the next milestone.
+> **Status:** complete: data pipeline, read API, portal and research assistant, all tested. Both required questions are answered with cited sources (see [Research assistant](#research-assistant)).
 
 ## Quickstart
 
@@ -79,6 +79,27 @@ Problems found and fixed during ingest (details in [`docs/data-quality.md`](docs
 
 **Institution.** Facts from OpenAlex. Campus photos are public-domain images from Wikimedia Commons, self-hosted and credited on the page.
 
+## Research assistant
+
+`POST /api/chat` streams Server-Sent Events `plan → sources → token… → done`. The UI shows the search plan, the source cards, then the answer, whose citations link to the cards.
+
+| Step | How | Model |
+|---|---|---|
+| 1. Understand | Question (+ last turns) → JSON plan: intent, concept groups, date window, sort, limit. JSON schema enforced, `think: false`. Falls back to the chat model with few-shot examples if the finetuned model is missing, and to a rule parser on timeout or an unusable plan | `uiuc-qu:4b` (Qwen3-4B + LoRA, finetuned for this step) |
+| 2. Retrieve | No LLM. **Papers:** candidates from full-text (works matching every concept group) ∪ nearest works to the question ∪ nearest works to the concepts, fused with reciprocal rank fusion, date window, outliers and duplicate versions removed. **Faculty:** keyword evidence per concept group (core term vs synonym, IDF-weighted, head-noun aware) + profile similarity + related papers, ranked so experts covering every part of the question come first | `bge-m3` embeddings, pgvector |
+| 3. Answer | Numbered sources → a short answer that cites only sources actually on topic and says plainly when few match; citations pointing to no source are removed | `qwen3:4b-instruct-2507` |
+
+**Query-understanding benchmark** (held-out questions not used for training, 57 total, `finetune/bench_native.py`, Ollama, schema enforced):
+
+| Model | Valid JSON | Intent | Sort | Dates | Concept recall | p50 latency |
+|---|---|---|---|---|---|---|
+| `uiuc-qu:4b` (finetuned) | 100% | 92–94% | **100%** | 92–97% | 97–100% | 6 s |
+| `qwen3:4b` + few-shot | 100% | 94–96% | 58–65% | 85–97% | 98% | 4–5 s |
+
+The finetuned model is what makes "most recent" / "most cited" questions reliable. Two lessons from building it: the Ollama chat template must match the training prompt (an always-open `<think>` block made the model ramble), and an LLM judge of 4B parameters could not reliably score search results, so the answer step selects relevant sources instead.
+
+**On the required questions:** UIUC has very few recent papers squarely about AI in war; the assistant names the closest ones (AI for children in armed conflict, conflict dynamics from social media) and says so rather than padding the list. For computer vision in healthcare it names faculty such as Jimeng Sun, Viktor Gruev, Minh N Do and Jim Rehg with their matching expertise.
+
 ## Front end
 
 The design was mocked up first, then built in Next.js. Motion follows a "data portal" brief: depth in the hero, then animation only where it helps reading numbers.
@@ -107,8 +128,8 @@ The database (≈150 MB compressed, over GitHub's 100 MB file limit) is not in t
 
 ## Known limitations
 
-- **Assistant backend pending.** `POST /api/chat` (query understanding with qwen3, hybrid full-text + vector retrieval with concept-group filtering, cited generation over SSE) is the next milestone. The UI, contract and tests are in place.
-- Faculty search is keyword (full-text) only until the hybrid retrieval lands, so broad terms such as "computer" can match loosely.
+- The finetuned `uiuc-qu:4b` is not on a public model registry yet; without it the assistant uses the chat model with few-shot examples (weaker on sort, see the benchmark).
+- Answers take about 10–20 s on a laptop GPU (three model calls). Faculty ranking for broad two-part questions is good but not perfect; the portal's faculty search box is still keyword-only.
 - OpenAlex data changes daily; counts in this README are from the 17–18 Nov 2026 ingest.
 
 Not an official University of Illinois site. Data: OpenAlex (CC0); faculty directory provided with the assessment; map © OpenStreetMap contributors.
