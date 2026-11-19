@@ -20,7 +20,6 @@ class ChatConfig:
     # retrieval
     pool: int = 200            # candidates from each of full-text and vector search
     k_rrf: int = 60            # reciprocal rank fusion constant
-    tau: float = 0.55          # min cosine for a concept group to count as matched by meaning
     related_k: int = 50        # papers used as faculty evidence
     w_keywords: float = 0.4
     w_vector: float = 0.3
