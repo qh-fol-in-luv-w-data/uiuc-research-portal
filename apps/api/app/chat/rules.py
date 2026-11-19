@@ -23,6 +23,19 @@ PAPERS = re.compile(r"\b(papers?|publications?|articles?|works?|studies|research
 LEAD = re.compile(
     r"^.*?\b(?:on|about|regarding|related to|in the area of|in the field of|work(?:s|ing)? on|research(?:es|ing)? on|studying)\s+",
 )
+# eval 2026-11-19: the planner refused explicit topic requests ("Papers on underwater basket weaving") and broad ones
+TOPIC_REQUEST = re.compile(r"\b(papers?|publications?|articles?|research|studies|work|faculty|professors?|experts?|who)\b"
+                           r".*\b(on|about|regarding|related to|in the (?:area|field) of)\s+\w")
+BROAD = re.compile(r"\b(research|stud(?:y|ies)|publish\w*|faculty|professors?|uiuc|illinois)\b|nghiên cứu", re.I)
+_VI = re.compile(r"[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]", re.I)
+_VI_WHO = re.compile(r"^\s*ai\b|giảng viên|giáo sư|nhà (?:khoa học|nghiên cứu)|chuyên gia", re.I)
+
+
+def vietnamese_who(question: str) -> bool:
+    """Vietnamese "Ai ..." means "who ...", not AI; the planner reads it as AI and returns papers."""
+    return bool(_VI.search(question) and _VI_WHO.search(question))
+
+
 FILLER = re.compile(r"\b(uiuc|illinois|university of illinois|the|recent|latest|newest|most cited|papers?|publications?)\b")
 
 

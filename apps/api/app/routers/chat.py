@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from ..chat.answer import OUT_OF_SCOPE, build_messages, build_sources, clean_citations, no_results
+from ..chat.answer import BROAD, OUT_OF_SCOPE, build_messages, build_sources, clean_citations, no_results
 from ..chat.ollama import OllamaError
 from ..chat.retrieve import FacultyIndex, search_faculty, search_papers
 from ..chat.understand import understand
@@ -70,8 +70,9 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
                                "source": source})
             if plan["intent"] == "out_of_scope":
                 yield sse("sources", {"sources": []})
-                yield sse("token", {"text": OUT_OF_SCOPE})
-                yield sse("done", {"answer": OUT_OF_SCOPE})
+                text = BROAD if plan.get("broad") else OUT_OF_SCOPE
+                yield sse("token", {"text": text})
+                yield sse("done", {"answer": text})
                 return
             groups = [g for g in plan["concepts"] if g]
             qv, cv = await ollama.embed(cfg.embed_model, [plan["standalone_question"],
@@ -85,7 +86,7 @@ async def chat(body: ChatRequest, request: Request) -> StreamingResponse:
                 yield sse("done", {"answer": text})
                 return
             answer = []
-            async for tok in ollama.chat_stream(cfg.chat_model, build_messages(body.question, history, context),
+            async for tok in ollama.chat_stream(cfg.chat_model, build_messages(body.question, history, context, plan["sort"]),
                                                 cfg.gen_timeout):
                 answer.append(tok)
                 yield sse("token", {"text": tok})
