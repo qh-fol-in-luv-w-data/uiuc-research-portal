@@ -102,3 +102,32 @@
 - {id: edge4, cat: edge, q: "Papers on underwater basket weaving", intent: papers, expect_few: true}
 - {id: edge5, cat: edge, q: "I'm a prospective PhD student interested in sustainable agriculture, especially how soil health, cover crops and nitrogen management affect yields and greenhouse gas emissions in the Midwest. Which UIUC faculty work on this, and what have they published recently that I should read first?", intent: [both, faculty], kw: "soil|crop|nitrogen|agri|emission|cover"}
 - {id: edge6, cat: edge, q: "Papers on AI; DROP TABLE works; --", intent: [papers, out_of_scope], kw: "artificial|AI|learning|intelligen"}
+
+# --- Vietnamese: the same categories as the English set (ui: page language sent with the request)
+- {id: vi6, cat: vietnamese, lang: vi, ui: vi, q: "Những bài báo mới nhất của UIUC về AI trong chiến tranh, xung đột là gì?", intent: papers, sort: recent, kw: "war|conflict|military|armed|defen|weapon|security"}
+- {id: vi7, cat: vietnamese, lang: vi, ui: vi, q: "Giảng viên nào nghiên cứu thị giác máy tính trong y tế?", intent: faculty, kw: "vision|imag|medical|health|clinic"}
+- {id: vi8, cat: vietnamese, lang: vi, ui: vi, q: "Các công bố gần đây về mô hình ngôn ngữ lớn", intent: papers, sort: recent, kw: "language model|LLM|GPT|transformer"}
+- {id: vi9, cat: vietnamese, lang: vi, ui: vi, q: "Nghiên cứu mới nhất về điện toán lượng tử", intent: papers, sort: recent, kw: "quantum|qubit"}
+- {id: vi10, cat: vietnamese, lang: vi, ui: vi, q: "Bài báo về pin lithium được trích dẫn nhiều nhất", intent: papers, sort: cited, kw: "batter|lithium|electrode|cathode|anode|electrolyte"}
+- {id: vi11, cat: vietnamese, lang: vi, ui: vi, q: "Các bài báo về năng suất đậu nành và ngô năm 2025", intent: papers, kw: "soybean|corn|maize|yield|crop", years: [2025]}
+- {id: vi12, cat: vietnamese, lang: vi, ui: vi, q: "Ai là chuyên gia về robot ở UIUC?", intent: faculty, kw: "robot"}
+- {id: vi13, cat: vietnamese, lang: vi, ui: vi, q: "Giáo sư nào làm về an ninh mạng?", intent: faculty, kw: "secur|crypt|privacy|cyber"}
+- {id: vi14, cat: vietnamese, lang: vi, ui: vi, q: "Giảng viên và bài báo về pin mặt trời perovskite", intent: [both, faculty, papers], kw: "solar|photovolt|perovskite"}
+- {id: vi15, cat: vietnamese, lang: vi, ui: vi, q: "Nghiên cứu về hệ vi sinh vật đường ruột", intent: papers, kw: "microbio|gut|bacteri|intestin"}
+- {id: vi16, cat: vietnamese, lang: vi, ui: vi, q: "Thời tiết ở Chicago hôm nay thế nào?", intent: out_of_scope}
+- {id: vi17, cat: vietnamese, lang: vi, ui: vi, q: "UIUC nghiên cứu những gì?", intent: [out_of_scope, papers, both]}
+- {id: vi18, cat: vietnamese, lang: vi, ui: en, q: "giang vien nao nghien cuu xu ly ngon ngu tu nhien", intent: [faculty, both], kw: "language|nlp|linguist|text"}
+- id: vi19
+  cat: vietnamese
+  lang: vi
+  ui: vi
+  history: [{role: user, content: "Các bài báo mới nhất về mô hình ngôn ngữ lớn"}, {role: assistant, content: "Các bài báo gần đây gồm nghiên cứu về tác tử LLM và đánh giá LLM [1][2]."}]
+  q: "Trong số đó bài nào được trích dẫn nhiều nhất?"
+  intent: papers
+  sort: cited
+  kw: "language model|LLM|GPT|transformer"
+- {id: vi20, cat: vietnamese, lang: vi, ui: vi, q: "graphene", intent: [papers, both], kw: "graphene|2d|carbon"}
+
+# --- English questions asked from the Vietnamese page get English answers
+- {id: x1, cat: cross_language, lang: en, ui: vi, q: "Most recent UIUC papers on wildfire smoke", intent: papers, sort: recent, kw: "fire|smoke|wildfire|burn"}
+- {id: x2, cat: cross_language, lang: en, ui: vi, q: "Which faculty work on crop genetics?", intent: faculty, kw: "crop|genet|plant|breed|genom"}

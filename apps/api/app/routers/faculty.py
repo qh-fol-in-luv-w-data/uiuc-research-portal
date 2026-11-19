@@ -32,7 +32,7 @@ def _card(row, q: str | None = None) -> FacultyCard:
 
 @router.get("/faculty", response_model=Page[FacultyCard])
 def list_faculty(q: str | None = None, position: str | None = None, field: str | None = None,
-                 page: int = Query(1, ge=1), page_size: int = Query(12, ge=1, le=50),
+                 page: int = Query(1, ge=1, le=10_000), page_size: int = Query(12, ge=1, le=50),
                  conn=Depends(get_conn)) -> Page[FacultyCard]:
     where, params = ["true"], {}
     if q:

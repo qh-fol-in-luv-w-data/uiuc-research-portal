@@ -22,7 +22,7 @@ LEAK = re.compile(r"<think>|</think>|Sources:\n|You answer questions about|syste
 
 
 def ask(client: httpx.Client, api: str, item: dict) -> dict:
-    body = {"question": item["q"], "history": item.get("history", [])}
+    body = {"question": item["q"], "history": item.get("history", []), "lang": item.get("ui", "en")}
     t0, ttft, events = time.perf_counter(), None, []
     with client.stream("POST", f"{api}/api/chat", json=body, timeout=180) as r:
         if r.status_code != 200:
@@ -82,8 +82,11 @@ def score(item: dict, res: dict) -> dict:
         fails.append(f"order(first [{cites[0]}], best cited [{min(cites)}])")  # e.g. calls an older paper "newest"
     if srcs and not cites and plan.get("intent") != "out_of_scope":
         fails.append("no_citation")
-    if item.get("lang") == "vi" and not VI.search(answer):
+    want = item.get("lang", "en")
+    if want == "vi" and not VI.search(answer):
         fails.append("not_vietnamese")
+    if want == "en" and VI.search(answer):
+        fails.append("not_english")
     if LEAK.search(answer):
         fails.append("leak")
     if not answer.strip():

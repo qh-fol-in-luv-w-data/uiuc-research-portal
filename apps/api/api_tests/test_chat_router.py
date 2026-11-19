@@ -103,3 +103,22 @@ def test_prompt_states_source_order():
     from app.chat.answer import build_messages
     assert "newest first" in build_messages("q", None, "[1] x", sort="recent")[-1]["content"]
     assert "most cited first" in build_messages("q", None, "[1] x", sort="cited")[-1]["content"]
+
+
+def test_busy_assistant_returns_429(db, tmp_path):
+    # one local model server: extra concurrent chats are refused instead of queueing up behind it
+    import asyncio
+    with client_with(db, tmp_path, FakeChatOllama(plan())) as c:
+        c.app.state.chat_slots = asyncio.Semaphore(0)  # every slot taken
+        r = c.post("/api/chat", json={"question": "recent papers on drones"})
+        assert r.status_code == 429 and r.json()["error"] == "busy"
+        c.app.state.chat_slots = asyncio.Semaphore(1)
+        assert c.post("/api/chat", json={"question": "recent papers on drones"}).status_code == 200
+        assert not c.app.state.chat_slots.locked()  # the slot is released when the stream ends
+
+
+def test_chat_strips_nul_bytes(db, tmp_path):
+    with client_with(db, tmp_path, FakeChatOllama(plan())) as c:
+        r = c.post("/api/chat", json={"question": "recent papers\u0000 on drones",
+                                      "history": [{"role": "user", "content": "x\u0000y"}]})
+        assert r.status_code == 200 and events(r.text)[-1][0] == "done"

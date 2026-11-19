@@ -34,3 +34,21 @@ def test_faculty_profile_and_404(client):
     assert p["topics"][0] == {"name": "Computer Vision", "count": 2}
     r = client.get("/api/faculty/999")
     assert r.status_code == 404 and r.json()["error"] == "not_found"
+
+
+def test_page_number_is_bounded(client):
+    assert client.get("/api/works?page=100000000000000000000").status_code == 422
+    assert client.get("/api/faculty?page=100000000000000000000").status_code == 422
+
+
+def test_nul_bytes_are_a_client_error_not_a_crash(client):
+    # eval/attacks.py 2026-11-19: "\x00" in a search crashed the request (Postgres text cannot contain NUL)
+    for path in ("/api/works?q=a%00b", "/api/faculty?q=a%00b", "/api/faculty?position=%00", "/api/works?field=%00"):
+        r = client.get(path)
+        assert r.status_code == 400 and r.json()["error"] == "bad_request", path
+
+
+def test_api_sessions_are_read_only(client):
+    # defence in depth: even an injected statement could not change data through the API's connections
+    with client.app.state.pool.connection() as conn:
+        assert conn.execute("SHOW default_transaction_read_only").fetchone()[0] == "on"

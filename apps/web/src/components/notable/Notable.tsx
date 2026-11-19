@@ -5,13 +5,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { WorkItem } from "@/components/WorkItem";
 import { openFaculty } from "@/lib/facultyEvents";
+import { useI18n } from "@/i18n/client";
 import type { Page, WorkCard } from "@/lib/types";
 import { useField } from "@/lib/useField";
 
 type Tab = "cited" | "recent";
-const TABS: { id: Tab; label: string }[] = [{ id: "cited", label: "Most cited" }, { id: "recent", label: "Most recent" }];
+const TABS: Tab[] = ["cited", "recent"];
 
 export function Notable({ initial }: { initial: Record<Tab, Page<WorkCard>> }) {
+  const { t: tr, f } = useI18n();
   const [tab, setTab] = useState<Tab>("cited");
   const [field] = useField();
   const [data, setData] = useState<Record<string, WorkCard[]>>({ "cited|": initial.cited.items, "recent|": initial.recent.items });
@@ -35,30 +37,30 @@ export function Notable({ initial }: { initial: Record<Tab, Page<WorkCard>> }) {
   const onKey = (e: React.KeyboardEvent, i: number) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     const next = (i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length;
-    setTab(TABS[next].id);
+    setTab(TABS[next]);
     tabRefs.current[next]?.focus();
   };
   const items = data[key];
 
   return (
     <div className="flex flex-col gap-4">
-      <div role="tablist" aria-label="Sort publications" className="flex self-start rounded-full bg-surface-2 p-1 ring-1 ring-line">
-        {TABS.map((t, i) => (
-          <button key={t.id} ref={(el) => { tabRefs.current[i] = el; }} type="button" role="tab" id={`tab-${t.id}`}
-            aria-selected={tab === t.id} aria-controls="notable-panel" tabIndex={tab === t.id ? 0 : -1}
-            onClick={() => setTab(t.id)} onKeyDown={(e) => onKey(e, i)}
-            className={`min-h-11 rounded-full px-5 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink shadow" : "text-muted hover:text-ink"}`}>
-            {t.label}
+      <div role="tablist" aria-label={tr.notable.sortLabel} className="flex self-start rounded-full bg-surface-2 p-1 ring-1 ring-line">
+        {TABS.map((id, i) => (
+          <button key={id} ref={(el) => { tabRefs.current[i] = el; }} type="button" role="tab" id={`tab-${id}`}
+            aria-selected={tab === id} aria-controls="notable-panel" tabIndex={tab === id ? 0 : -1}
+            onClick={() => setTab(id)} onKeyDown={(e) => onKey(e, i)}
+            className={`min-h-11 rounded-full px-5 text-sm font-semibold transition ${tab === id ? "bg-surface text-ink shadow" : "text-muted hover:text-ink"}`}>
+            {tr.notable.tabs[id]}
           </button>
         ))}
       </div>
       <div id="notable-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} aria-busy={!items}>
         {error && !items ? (
-          <p className="rounded-xl border border-line bg-surface p-5 text-muted">Publications could not be loaded. Reload the page to try again.</p>
+          <p className="rounded-xl border border-line bg-surface p-5 text-muted">{tr.notable.error}</p>
         ) : !items ? (
           <div className="flex flex-col gap-3">{[0, 1, 2].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-surface" />)}</div>
         ) : items.length === 0 ? (
-          <p className="rounded-xl border border-line bg-surface p-5 text-muted">No publications in {field} for this view.</p>
+          <p className="rounded-xl border border-line bg-surface p-5 text-muted">{tr.notable.empty(f.field(field))}</p>
         ) : (
           <AnimatePresence mode="wait" initial={false}>
             <motion.ol key={key} className="flex flex-col gap-3"

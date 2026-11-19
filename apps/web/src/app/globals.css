@@ -76,9 +76,9 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-ink: var(--accent-soft-ink);
-  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
-  --font-display: var(--font-plex-condensed), var(--font-plex-sans), system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-sans: var(--font-plex-sans-vi), var(--font-plex-sans), system-ui, sans-serif;
+  --font-display: var(--font-plex-condensed-vi), var(--font-plex-condensed), var(--font-plex-sans-vi), var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono-vi), var(--font-plex-mono), ui-monospace, monospace;
 }
 
 html {

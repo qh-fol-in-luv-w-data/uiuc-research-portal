@@ -1,6 +1,6 @@
 # UIUC Research Portal
 
-A single-page research portal for the University of Illinois Urbana-Champaign, built on two years of OpenAlex data (Nov 2024 – Nov 2026) and a directory of 999 faculty, paired with a local LLM research assistant.
+A single-page research portal for the University of Illinois Urbana-Champaign, built on two years of OpenAlex data (Nov 2024 – Nov 2026) and a directory of 999 faculty, paired with a local LLM research assistant. The portal and the assistant work in **English and Vietnamese** (`/en`, `/vi`).
 
 ![Desktop](docs/screenshots/desktop.png)
 
@@ -13,7 +13,7 @@ Prerequisites: Docker, and [Ollama](https://ollama.com) installed and running on
 ```bash
 git clone https://github.com/qh-fol-in-luv-w-data/uiuc-research-portal.git && cd uiuc-research-portal
 docker compose up -d
-open http://localhost:3000
+open http://localhost:3000        # redirects to /en or /vi from the browser language
 ```
 
 That's all. Docker pulls three prebuilt images from GitHub Container Registry (amd64 and arm64):
@@ -30,7 +30,7 @@ Build from source instead of pulling: `docker compose build && docker compose up
 
 No Ollama on the host? Run a bundled one (CPU only inside Docker on macOS, so slow): `OLLAMA_URL=http://ollama:11434 docker compose --profile ollama up -d`.
 
-Ports: web `3000`, API `8010`, Postgres `55432`. Override any of them, e.g. `WEB_PORT=3100 docker compose up -d`.
+Ports: web `3000`, API `8010`, Postgres `55432`, all bound to `127.0.0.1` so nothing is reachable from other machines (the database has a fixed development password). Override any of them, e.g. `WEB_PORT=3100 docker compose up -d`; to show the portal on your network, `BIND_ADDR=0.0.0.0` (this exposes the API and database too).
 
 ## Architecture
 
@@ -56,6 +56,7 @@ flowchart LR
 | `apps/web/` | Next.js 16 portal (App Router, Cache Components / partial prerendering, Tailwind 4, motion) |
 | `db/migrations/` | Schema: works, authors, authorships, institutions, topics, faculty, links, stats cache |
 | `docs/data-quality.md` | Generated data-quality report |
+| `docs/security.md` | Security review: scans, attack results, fixes, residual risks |
 | `docs/superpowers/` | Design spec and implementation plans |
 
 ## Data
@@ -83,6 +84,8 @@ Problems found and fixed during ingest (details in [`docs/data-quality.md`](docs
 
 `POST /api/chat` streams Server-Sent Events `plan → sources → token… → done`. The UI shows the search plan, the source cards, then the answer, whose citations link to the cards.
 
+**English and Vietnamese.** Questions can be asked in either language, with or without Vietnamese accents. The answer follows the question's language; a question with no clear language ("graphene") follows the page language. The finetuned planner turns Vietnamese questions into English search concepts (the records are in English), the answer model is told the reply language explicitly, and the fixed replies (out of scope, nothing found) and source cards are localized. Paper titles and names are kept as written.
+
 | Step | How | Model |
 |---|---|---|
 | 1. Understand | Question (+ last turns) → JSON plan: intent, concept groups, date window, sort, limit. JSON schema enforced, `think: false`. Falls back to the chat model with few-shot examples if the finetuned model is missing, and to a rule parser on timeout or an unusable plan | [`hodacquan2004/uiuc-qu:4b`](https://ollama.com/hodacquan2004/uiuc-qu) (Qwen3-4B + LoRA, finetuned for this step, Q4_K_M; `:4b-q8` also published) |
@@ -107,6 +110,7 @@ The finetuned model is what makes "most recent" / "most cited" questions reliabl
 
 The design was mocked up first, then built in Next.js. Motion follows a "data portal" brief: depth in the hero, then animation only where it helps reading numbers.
 
+- English and Vietnamese at `/en` and `/vi` (Next.js root params, statically prerendered for both). `/` picks the language from a saved choice or the browser's `Accept-Language`; the header switch keeps the field filter. Field names, publication types, countries (`Intl.DisplayNames`), numbers and dates are localized; publication data stays in English. Vietnamese letters come from IBM Plex's Vietnamese subset, loaded only when a page uses them (`unicode-range`).
 - Hero with depth layers (grid texture, gradient glows, parallax campus photo), masked line reveal, KPI count-up.
 - Research fields as a proportional tile map. Selecting a field filters publications and faculty, and the filter is kept in the URL (`?field=`) so a filtered view can be shared.
 - Monthly output chart (plain CSS bars, no chart library); January spikes are explained, and the current month is marked partial.
@@ -119,8 +123,10 @@ The design was mocked up first, then built in Next.js. Motion follows a "data po
 ## Tests
 
 ```bash
-make test   # 63 Python tests (ingest + API) and 9 web unit tests
-make e2e    # 8 Playwright end-to-end tests against the running stack (uses the local Chrome)
+make test   # 109 Python tests (ingest + API) and 10 web unit tests
+make e2e    # 10 Playwright end-to-end tests against the running stack (uses the local Chrome)
+make eval   # 84 real questions (64 English, 20 Vietnamese) through the full stack; writes eval/report.md
+make attacks  # SQL-injection and prompt-injection attacks against the assistant; see docs/security.md
 ```
 
 End-to-end coverage includes: every section renders real data with no console errors; the field filter updates the URL and narrows results; tab keyboard navigation; faculty search → drawer → Esc → focus return; the assistant streaming contract (mocked SSE); the offline state; reduced motion; and the phone layout.

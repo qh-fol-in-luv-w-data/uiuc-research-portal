@@ -17,7 +17,7 @@ ORDER = {
 @router.get("/works", response_model=Page[WorkCard])
 def list_works(q: str | None = None, field: str | None = None,
                sort: Literal["recent", "cited", "relevance"] = "relevance",
-               page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=50),
+               page: int = Query(1, ge=1, le=10_000), page_size: int = Query(10, ge=1, le=50),
                conn=Depends(get_conn)) -> Page[WorkCard]:
     where, params = [LIVE], {}
     if field:
