@@ -24,4 +24,5 @@ class ChatConfig:
     w_keywords: float = 0.4
     w_vector: float = 0.3
     w_papers: float = 0.3
-    max_papers: int = 8        # sources shown for intent=both are split between papers and faculty
+    max_papers: int = 10       # paper sources given to the answer step (it cites only the relevant ones)
+    max_faculty: int = 6
