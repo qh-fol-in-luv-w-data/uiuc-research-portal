@@ -22,7 +22,7 @@ class ChatConfig:
     k_rrf: int = 60            # reciprocal rank fusion constant
     related_k: int = 50        # papers used as faculty evidence
     w_keywords: float = 0.4
-    w_vector: float = 0.3
-    w_papers: float = 0.3
+    w_vector: float = 0.4
+    w_papers: float = 0.2
     max_papers: int = 10       # paper sources given to the answer step (it cites only the relevant ones)
     max_faculty: int = 6

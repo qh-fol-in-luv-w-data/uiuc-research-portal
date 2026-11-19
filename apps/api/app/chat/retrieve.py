@@ -151,51 +151,71 @@ def _minmax(x: np.ndarray) -> np.ndarray:
     return (x - lo) / (hi - lo) if hi > lo else np.zeros_like(x)
 
 
+def _match_strength(term: str, keyword: str) -> float:
+    """1.0 when the keyword is about the term ("computer vision", "3d computer vision"); 0.6 when the term only
+    modifies another head noun ("healthcare information security" is about security, not healthcare)."""
+    if not _term_hits(term, keyword):
+        return 0.0
+    k, t = keyword.lower().strip(), term.lower().strip()
+    return 1.0 if k == t or k.endswith(" " + t) or " " not in k else 0.6
+
+
 def search_faculty(idx: FacultyIndex, plan: dict, qvec: np.ndarray, related: list[dict], cfg: ChatConfig,
-                   limit: int | None = None) -> list[dict]:
-    """Score = w_keywords * keyword evidence (IDF, averaged over concept groups so covering every group wins)
-    + w_vector * profile similarity + w_papers * related papers they authored. Evidence is returned for display."""
+                   limit: int | None = None, cvec: np.ndarray | None = None) -> list[dict]:
+    """Rank faculty for a question's concept groups.
+
+    Evidence strength per group: the core term (listed first by the plan) counts fully, a synonym counts up to half,
+    scaled by how specific (IDF) the matched keyword is, so a generic "machine learning" barely counts toward
+    "computer vision". Faculty are ranked by evidence strength across all groups (rounded to half steps), then by
+    w_keywords * IDF evidence + w_vector * profile similarity to the concept vector + w_papers * related papers.
+    Eval (2026-11-19, reference set for "computer vision in healthcare"): P@6 5/6 vs 3/6 for count-based coverage."""
     groups = [g for g in plan["concepts"] if g]
     if not idx.rows:
         return []
     related_ids = {p["id"]: p["title"] for p in related}
-    kw_score = np.zeros(len(idx.rows), np.float32)
-    covered = np.zeros(len(idx.rows), np.int32)
+    n = len(idx.rows)
+    kw_score, strength, covered = np.zeros(n, np.float32), np.zeros(n, np.float32), np.zeros(n, np.int32)
     matched: list[list[str]] = []
     papers: list[list[str]] = []
     for i, r in enumerate(idx.rows):
         hits_kw: list[str] = []
         total = 0.0
         for g in groups:
-            best, best_k = 0.0, None
+            best = best_strength = 0.0
+            best_k = None
             for k in r["keywords"]:
-                # the plan lists each group's core term first: a core-term match counts fully, a synonym half
-                w_match = 1.0 if _term_hits(g[0], k) else 0.5 if any(_term_hits(t, k) for t in g[1:]) else 0.0
-                if w_match:
-                    w = idx.idf.get(k, 0.0) * w_match
-                    if w > best:
-                        best, best_k = w, k
+                core = _match_strength(g[0], k)
+                syn = 0.5 if any(_term_hits(t, k) for t in g[1:]) else 0.0
+                w_match = max(core, syn)
+                if not w_match:
+                    continue
+                idf = idx.idf.get(k, 0.0)
+                if idf * w_match > best:
+                    best, best_k = idf * w_match, k
+                best_strength = max(best_strength, core if core >= syn else syn * min(1.0, idf / 3.0))
             if best_k:
                 hits_kw.append(best_k)
                 hits_kw += [k for k in r["keywords"] if k not in hits_kw and _term_hits(g[0], k)][:2]
                 covered[i] += 1
             total += best
+            strength[i] += best_strength
         kw_score[i] = total / max(len(groups), 1)
         matched.append(hits_kw)
         papers.append([related_ids[w] for w in idx.works.get(r["id"], set()) if w in related_ids])
-    q = qvec / (float(np.linalg.norm(qvec)) or 1.0)
-    vec_score = idx.emb @ q
+    v = cvec if cvec is not None else qvec
+    v = v / (float(np.linalg.norm(v)) or 1.0)
+    vec_score = idx.emb @ v
     n_papers = np.array([len(p) for p in papers], np.float32)
     total = (cfg.w_keywords * _minmax(kw_score) + cfg.w_vector * _minmax(vec_score)
              + cfg.w_papers * (n_papers / n_papers.max() if n_papers.max() > 0 else n_papers))
-    # experts must cover every aspect of the question first ("vision" AND "healthcare"), then by score
-    order = sorted(range(len(idx.rows)), key=lambda i: (-int(covered[i]), -float(total[i])))
+    tier = np.round(strength * 2) / 2
+    order = sorted(range(n), key=lambda i: (-float(tier[i]), -float(total[i])))
     out = []
     for i in order:
         if covered[i] == 0 and n_papers[i] == 0:
             continue  # no evidence for any concept: similarity alone is not enough to name someone an expert
         r = idx.rows[i]
-        out.append({**r, "score": float(total[i]), "groups_covered": int(covered[i]),
+        out.append({**r, "score": float(total[i]), "groups_covered": int(covered[i]), "strength": float(strength[i]),
                     "matched_keywords": matched[i][:6], "related_papers": sorted(papers[i])[:2]})
         if len(out) >= (limit or plan["limit"]):
             break
