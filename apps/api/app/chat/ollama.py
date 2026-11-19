@@ -31,9 +31,9 @@ class Ollama:
             raise OllamaError(f"Ollama error {r.status_code}: {r.text[:200]}")
         return r
 
-    async def chat_json(self, model: str, messages: list[dict], schema: dict) -> str:
+    async def chat_json(self, model: str, messages: list[dict], schema: dict, num_predict: int = 400) -> str:
         r = await self._post("/api/chat", {"model": model, "messages": messages, "stream": False, "think": False,
-                                           "format": schema, "options": {"temperature": 0, "num_predict": 400}}, 60)
+                                           "format": schema, "options": {"temperature": 0, "num_predict": num_predict}}, 90)
         return r.json()["message"]["content"] or ""
 
     async def chat_stream(self, model: str, messages: list[dict], timeout: float) -> AsyncIterator[str]:
