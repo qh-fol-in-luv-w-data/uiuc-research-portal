@@ -52,6 +52,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      ollama:  # only with --profile ollama: wait for it, or the model pull is skipped
+        condition: service_healthy
+        required: false
 
   api:
     <<: *api-image
@@ -86,6 +89,11 @@ services:
       - ollama:/root/.ollama
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${OLLAMA_PORT:-11435}:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
 volumes:
   pgdata: {}
