@@ -28,7 +28,13 @@ On first start the database restores itself (a couple of minutes). A one-shot `s
 
 Build from source instead of pulling: `docker compose build && docker compose up -d`. With an empty database and no dump, `setup` runs the full ingest from OpenAlex (about 40 minutes), which needs the provided `illinois-researchers.csv` in `data/`.
 
-No Ollama on the host? Run a bundled one (CPU only inside Docker on macOS, so slow): `OLLAMA_URL=http://ollama:11434 docker compose --profile ollama up -d`.
+**On Linux, or with no Ollama on the host, use the bundled one.** A default Linux Ollama listens only on `127.0.0.1`, which containers cannot reach, so the assistant would stay offline:
+
+```bash
+OLLAMA_URL=http://ollama:11434 docker compose --profile ollama up -d
+```
+
+It needs about 8 GB of RAM and 8 GB of disk for the models, and runs on the CPU, so answers are slower. Keep the same `OLLAMA_URL` and `--profile` on later `docker compose` commands.
 
 Ports: web `3000`, API `8010`, Postgres `55432`, all bound to `127.0.0.1` so nothing is reachable from other machines (the database has a fixed development password). Override any of them, e.g. `WEB_PORT=3100 docker compose up -d`; to show the portal on your network, `BIND_ADDR=0.0.0.0` (this exposes the API and database too).
 
