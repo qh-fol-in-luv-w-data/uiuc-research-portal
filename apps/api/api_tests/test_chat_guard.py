@@ -41,3 +41,16 @@ def test_names_and_years_found_in_sources_are_kept():
     g = SentenceGuard(question="Papers by Jimeng Sun in 2025", evidence="[1] X (Article, May 2025). UIUC authors: Jimeng Sun.")
     out = "".join(g.feed("Jimeng Sun published X in May 2025 [1]. ")) + g.flush()
     assert out.strip() == "Jimeng Sun published X in May 2025 [1]."
+
+
+def test_guard_can_drop_model_claims_about_the_newest_source():
+    from app.chat.guard import clean_answer
+    text = "The most recent paper is X [7]. Another study covers logistics [2]. Đây là bài mới nhất [3]."
+    assert clean_answer(text, drop_newest=True) == "Another study covers logistics [2]."
+    assert "most recent" in clean_answer(text)
+
+
+def test_guard_drops_source_lines_copied_after_the_lead():
+    from app.chat.guard import clean_answer
+    text = "[4] Anatomy of Conflict (Paper, Jul 2025). UIUC authors: A B. It maps belief dynamics in conflict areas [4]."
+    assert clean_answer(text, drop_newest=True) == "It maps belief dynamics in conflict areas [4]."

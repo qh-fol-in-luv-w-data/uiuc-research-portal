@@ -26,6 +26,10 @@ def search_papers(conn: psycopg.Connection, plan: dict, qvec: np.ndarray, cvec: 
     Per-group concept vectors proved unable to separate on- from off-topic works (eval 2026-11-19), so the final
     on-topic judgement is left to the answer step, which cites only relevant sources."""
     groups = [g for g in plan["concepts"] if g]
+    if plan["sort"] == "recent" and groups:
+        on_topic = _recent_on_topic(conn, plan, groups, qvec, cvec, cfg, limit or plan["limit"])
+        if len(on_topic) >= cfg.recent_min:
+            return on_topic
     params: dict = {"pool": cfg.pool, "qvec": qvec, "cvec": cvec}
     tsq = []
     for i, g in enumerate(groups):
@@ -77,6 +81,56 @@ def search_papers(conn: psycopg.Connection, plan: dict, qvec: np.ndarray, cvec: 
     if key:
         hits.sort(key=key, reverse=True)
     _attach_authors(conn, hits)
+    return hits
+
+
+def select_on_topic(rows: list[tuple], n_groups: int, near: float, near_focus: float, limit: int) -> list[str]:
+    """Newest works that are really about the question. `rows` are (id, date, distance, [has head term of each group]),
+    all matching every concept by text. A fused top-k cut before sorting by date dropped the newest on-topic work
+    (eval 2026-11-22: the required "AI in war" question missed an Aug 2026 paper and listed domestic-violence ones)."""
+    if not rows:
+        return []
+    best = min(r[2] for r in rows)
+    focus = None
+    if n_groups > 1:  # the rarest head term is what makes the query specific ("war" rather than "AI")
+        counts = [sum(r[3][i] for r in rows) for i in range(n_groups)]
+        present = [i for i, c in enumerate(counts) if c]
+        focus = min(present, key=counts.__getitem__) if present else None
+    keep = [r for r in rows if r[2] <= best + near or (focus is not None and r[3][focus] and r[2] <= best + near_focus)]
+    keep.sort(key=lambda r: (r[1], -r[2]), reverse=True)
+    return [r[0] for r in keep[:limit]]
+
+
+def _recent_on_topic(conn: psycopg.Connection, plan: dict, groups: list[list[str]], qvec: np.ndarray, cvec: np.ndarray,
+                     cfg: ChatConfig, limit: int) -> list[dict]:
+    params: dict = {"qvec": qvec, "cvec": cvec, "today": date.today(), "d_from": plan.get("date_from"),
+                    "d_to": plan.get("date_to")}
+    core, heads = [], []
+    for i, g in enumerate(groups):
+        params[f"c{i}"], params[f"h{i}"] = ts_or(g[:2]), ts_or(g[:1])
+        core.append(f"w.tsv @@ websearch_to_tsquery('english', %(c{i})s)")
+        heads.append(f"w.tsv @@ websearch_to_tsquery('english', %(h{i})s)")
+    sql = f"""
+        SELECT w.id, w.publication_date, least(w.embedding <=> %(qvec)s, w.embedding <=> %(cvec)s), {', '.join(heads)}
+        FROM works w
+        WHERE {LIVE} AND w.embedding IS NOT NULL AND w.publication_date <= %(today)s
+          AND (%(d_from)s::date IS NULL OR w.publication_date >= %(d_from)s::date)
+          AND (%(d_to)s::date IS NULL OR w.publication_date <= %(d_to)s::date)
+          AND {' AND '.join(core)}"""
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = [(r[0], r[1], float(r[2]), list(r[3:])) for r in cur.fetchall()]
+        ids = select_on_topic(rows, len(groups), cfg.recent_near, cfg.recent_near_focus, limit)
+        cur.execute("""SELECT w.id, w.title, w.publication_date, w.type, w.venue_name, w.cited_by_count, w.doi, t.field,
+                              left(w.abstract, 600)
+                       FROM works w LEFT JOIN topics t ON t.id = w.primary_topic_id WHERE w.id = ANY(%s)""", (ids,))
+        found = {r[0]: r for r in cur.fetchall()}
+    conn.rollback()
+    hits = [{"id": i, "title": found[i][1], "publication_date": found[i][2], "type": found[i][3], "venue": found[i][4],
+             "cited_by_count": found[i][5], "doi": found[i][6], "field": found[i][7], "abstract": found[i][8],
+             "score": 0.0, "matched_by": ["text"] * len(groups), "on_topic": True} for i in ids]
+    if len(hits) >= cfg.recent_min:
+        _attach_authors(conn, hits)
     return hits
 
 

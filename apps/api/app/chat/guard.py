@@ -44,6 +44,8 @@ _COMMON = {"UIUC", "Illinois", "University", "Urbana", "Champaign", "AI", "I", "
            "Show", "List", "Give", "Find", "Tell"}
 _NAME = re.compile(r"(?<![.!?:]\s)(?<!^)\b([A-Z][\w'-]+)")
 _NUMBER = re.compile(r"\b\d{3,}\b")
+# after a code-written opening: claims about the newest source, and source lines copied from the prompt
+_NEWEST = re.compile(r"\b(most recent|newest|latest)\b|mới nhất|gần đây nhất|^\s*\[\d+\]\s+\S|UIUC authors:", re.I)
 
 
 def foreign_terms(question: str, evidence: str) -> set[str]:
@@ -57,11 +59,14 @@ def foreign_terms(question: str, evidence: str) -> set[str]:
 class SentenceGuard:
     """Feed streamed tokens; get back only complete, safe sentences (with their trailing whitespace)."""
 
-    def __init__(self, question: str = "", evidence: str = "") -> None:
+    def __init__(self, question: str = "", evidence: str = "", drop_newest: bool = False) -> None:
         self.buf = ""
         self.foreign = [re.compile(rf"\b{re.escape(t)}\b") for t in foreign_terms(question, evidence)]
+        self.drop_newest = drop_newest  # the opening sentence already names the newest source, written by code
 
     def _ok(self, sentence: str) -> bool:
+        if self.drop_newest and _NEWEST.search(sentence):
+            return False
         return _keep(sentence) and not any(p.search(sentence) for p in self.foreign)
 
     def feed(self, token: str) -> Iterator[str]:
@@ -79,7 +84,7 @@ class SentenceGuard:
         return rest if rest.strip() and self._ok(rest) else ""
 
 
-def clean_answer(text: str, question: str = "", evidence: str = "") -> str:
-    g = SentenceGuard(question, evidence)
+def clean_answer(text: str, question: str = "", evidence: str = "", drop_newest: bool = False) -> str:
+    g = SentenceGuard(question, evidence, drop_newest)
     out = "".join(g.feed(text)) + g.flush()
     return re.sub(r"\n{3,}", "\n\n", out).strip()

@@ -32,6 +32,7 @@ TEXT = {
         "this_topic": "this topic",
         "and": " and ",
         "error": "The assistant could not finish: {exc}",
+        "newest": "The most recent matching paper is \"{title}\" ({date}) [1].",
     },
     "vi": {
         "out_of_scope": "Tôi chỉ hỗ trợ các câu hỏi về nghiên cứu tại Đại học Illinois Urbana-Champaign (UIUC): công bố "
@@ -44,6 +45,7 @@ TEXT = {
         "this_topic": "chủ đề này",
         "and": " và ",
         "error": "Trợ lý không thể hoàn tất câu trả lời: {exc}",
+        "newest": "Công bố phù hợp mới nhất là \"{title}\" ({date}) [1].",
     },
 }
 

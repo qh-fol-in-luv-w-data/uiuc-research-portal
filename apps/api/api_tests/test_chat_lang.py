@@ -52,3 +52,14 @@ def test_rules_understand_vietnamese():
     assert parse("Giảng viên nào nghiên cứu về thị giác máy tính?", TODAY)["intent"] == "faculty"
     p = parse("Các công bố về năng lượng mặt trời năm 2025", TODAY)
     assert p["date_from"] == "2025-01-01" and p["date_to"] == "2025-12-31"
+
+
+def test_newest_lead_names_first_on_topic_source_in_reply_language():
+    from datetime import date
+    from app.chat.answer import newest_lead
+    p = [{"title": "RA-Bench", "publication_date": date(2026, 8, 14), "on_topic": True}]
+    assert newest_lead(p, "en") == 'The most recent matching paper is "RA-Bench" (Aug 2026) [1].'
+    assert newest_lead(p, "vi") == 'Công bố phù hợp mới nhất là "RA-Bench" (tháng 8/2026) [1].'
+    assert newest_lead([{**p[0], "on_topic": False}], "en") == ""
+    assert newest_lead([{**p[0], "title": "See http://evil.example"}], "en") == ""
+    assert newest_lead([], "en") == ""

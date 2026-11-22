@@ -58,3 +58,19 @@ def test_date_window_and_cited_sort(db):
     seed(db)
     plan = {**PLAN, "sort": "cited", "date_from": "2025-06-01", "date_to": "2025-12-31"}
     assert [h["id"] for h in search_papers(db, plan, QVEC, CVEC, CFG)] == ["WVEC"]
+
+
+def test_select_on_topic_keeps_close_works_and_focus_term_matches():
+    from app.chat.retrieve import select_on_topic
+    from datetime import date as d
+    rows = [("close", d(2025, 1, 1), .40, [True, False]), ("near", d(2026, 1, 1), .49, [True, False]),
+            ("noise", d(2026, 9, 1), .53, [True, False]), ("focus", d(2026, 8, 1), .53, [True, True]),
+            ("far", d(2026, 10, 1), .60, [True, True])]
+    assert select_on_topic(rows, 2, near=.10, near_focus=.15, limit=8) == ["focus", "near", "close"]
+
+
+def test_select_on_topic_single_concept_has_no_focus_widening():
+    from app.chat.retrieve import select_on_topic
+    from datetime import date as d
+    rows = [("a", d(2025, 1, 1), .40, [True]), ("b", d(2026, 1, 1), .53, [True])]
+    assert select_on_topic(rows, 1, near=.10, near_focus=.15, limit=8) == ["a"]

@@ -73,12 +73,27 @@ ORDER = {"recent": "sorted newest first, so [1] is the newest", "cited": "sorted
          "relevance": "most relevant first"}
 
 
+def newest_lead(papers: list[dict], lang: str = "en") -> str:
+    """Opening sentence for a "newest" question, written by code: a 4B model often called an older source the newest."""
+    if not papers or not papers[0].get("on_topic") or not papers[0].get("publication_date"):
+        return ""
+    title = papers[0]["title"]
+    if re.search(r"https?://|www\.|<|\]\(", title):  # third-party text: never put a link or markup in the answer
+        return ""
+    return text(lang, "newest").format(title=title, date=month(papers[0]["publication_date"], lang))
+
+
 def build_messages(question: str, history: list[dict] | None, sources_text: str, sort: str = "relevance",
-                   reply_lang: str = "en") -> list[dict]:
+                   reply_lang: str = "en", has_lead: bool = False) -> list[dict]:
     msgs = [{"role": "system", "content": SYSTEM}]
     for turn in (history or [])[-4:]:
         msgs.append({"role": turn["role"], "content": turn["content"]})
-    msgs.append({"role": "user", "content": f"Sources ({ORDER.get(sort, ORDER['relevance'])}):\n{sources_text}\n\nQuestion: {question}\n\nAnswer in {'Vietnamese' if reply_lang == 'vi' else 'English'}."})
+    note = ("The opening sentence naming [1] as the newest is already written. Write only what comes after it: 2 to 3 "
+            "sentences in your own words on what the on-topic sources contribute, citing each as [n]. Do not copy "
+            "source lines, titles or author lists, and do not call any source the newest or latest.\n") if has_lead else ""
+    msgs.append({"role": "user", "content": f"Sources ({ORDER.get(sort, ORDER['relevance'])}):\n{sources_text}\n\n"
+                                            f"Question: {question}\n\n{note}Answer in "
+                                            f"{'Vietnamese' if reply_lang == 'vi' else 'English'}."})
     return msgs
 
 

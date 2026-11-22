@@ -11,7 +11,7 @@ from starlette.background import BackgroundTask
 from pydantic import AfterValidator, BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from ..chat.answer import build_messages, build_sources, clean_citations, no_results
+from ..chat.answer import build_messages, build_sources, clean_citations, newest_lead, no_results
 from ..chat.guard import SentenceGuard, clean_answer
 from ..chat.lang import reply_language, text
 from ..chat.ollama import OllamaError
@@ -121,8 +121,11 @@ async def _answer(body: ChatRequest, request: Request, history: list[dict], repl
             return
         # Prompt-injection isolation: the answer model sees the planner's rewritten standalone question (which already
         # folds in the conversation), never the raw user text or history; its output passes a sentence guard.
-        messages = build_messages(plan["standalone_question"], None, context, plan["sort"], reply)
-        guard, answer = SentenceGuard(body.question, context), []
+        lead = newest_lead(papers, reply) if plan["intent"] == "papers" and plan["sort"] == "recent" else ""
+        messages = build_messages(plan["standalone_question"], None, context, plan["sort"], reply, has_lead=bool(lead))
+        guard, answer = SentenceGuard(body.question, context, drop_newest=bool(lead)), []
+        if lead:
+            yield sse("token", {"text": lead + " "})
         async for tok in ollama.chat_stream(cfg.chat_model, messages, cfg.gen_timeout):
             for safe in guard.feed(tok):
                 answer.append(safe)
@@ -130,7 +133,8 @@ async def _answer(body: ChatRequest, request: Request, history: list[dict], repl
         if tail := guard.flush():
             answer.append(tail)
             yield sse("token", {"text": tail})
-        final = clean_citations(clean_answer("".join(answer), body.question, context), len(sources))
+        final = clean_citations(clean_answer("".join(answer), body.question, context, drop_newest=bool(lead)), len(sources))
+        final = f"{lead} {final}".strip()
         if not final:  # everything the model wrote was filtered out
             final = no_results(plan, reply)
             yield sse("token", {"text": final})
