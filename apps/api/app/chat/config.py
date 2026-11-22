@@ -32,5 +32,8 @@ class ChatConfig:
     w_vector: float = 0.4
     w_papers: float = 0.2
     max_papers: int = 8        # paper sources given to the answer step (it cites only the relevant ones)
+    recent_near: float = 0.10        # "newest" questions: keep text matches this close (cosine) to the best match
+    recent_near_focus: float = 0.15  # ...or this close when they also contain the query's rarest concept term
+    recent_min: int = 3              # fewer on-topic works than this: fall back to the fused ranking
     abstract_chars: int = 200  # per source in the answer prompt: shorter prompt = faster first token
     max_faculty: int = 6
