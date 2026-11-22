@@ -34,7 +34,7 @@ Build from source instead of pulling: `docker compose build && docker compose up
 OLLAMA_URL=http://ollama:11434 docker compose --profile ollama up -d
 ```
 
-It needs about 8 GB of RAM and 8 GB of disk for the models, and runs on the CPU, so answers are slower. Keep the same `OLLAMA_URL` and `--profile` on later `docker compose` commands.
+It needs about 8 GB of RAM and more than 25 GB of free disk (images, database and 8 GB of models), and runs on the CPU, so answers are slower. Keep the same `OLLAMA_URL` and `--profile` on later `docker compose` commands.
 
 Ports: web `3000`, API `8010`, Postgres `55432`, all bound to `127.0.0.1` so nothing is reachable from other machines (the database has a fixed development password). Override any of them, e.g. `WEB_PORT=3100 docker compose up -d`; to show the portal on your network, `BIND_ADDR=0.0.0.0` (this exposes the API and database too).
 
